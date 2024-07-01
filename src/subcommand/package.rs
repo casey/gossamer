@@ -10,9 +10,9 @@ pub struct Package {
 
 impl Package {
   pub fn run(self) -> Result {
-    let paths = self.paths()?;
-
     let metadata = Metadata::load(&self.root.join(Metadata::PATH))?;
+
+    let paths = self.paths()?;
 
     let template = metadata.template(&self.root, &paths)?;
 
