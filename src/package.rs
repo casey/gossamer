@@ -50,6 +50,8 @@ pub enum Error {
     backtrace: Backtrace,
     magic: [u8; 10],
   },
+  #[snafu(display("package contains {extra} extra files not accounted for in manifest"))]
+  ManifestExtraFiles { extra: u64, backtrace: Backtrace },
   #[snafu(display("manifest index {index} out of bounds of hash array"))]
   ManifestIndexOutOfBounds { backtrace: Backtrace, index: usize },
   #[snafu(display("could not convert manifest index {index} to usize"))]
@@ -58,6 +60,8 @@ pub enum Error {
     index: u64,
     source: TryFromIntError,
   },
+  #[snafu(display("package missing {missing} files from manifest"))]
+  ManifestMissingFiles { missing: u64, backtrace: Backtrace },
   #[snafu(display("package has trailing {trailing} bytes"))]
   TrailingBytes { backtrace: Backtrace, trailing: u64 },
 }
@@ -145,8 +149,10 @@ impl Package {
       }
     );
 
-    let manifest = ciborium::from_reader(Cursor::new(files.get(&manifest).unwrap()))
+    let manifest: Manifest = ciborium::from_reader(Cursor::new(files.get(&manifest).unwrap()))
       .context(DeserializeManifest)?;
+
+    manifest.verify(&files)?;
 
     Ok(Self { manifest, files })
   }
@@ -212,14 +218,10 @@ impl Package {
 
   pub fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
     match &self.manifest {
-      Manifest::App { paths, .. } => {
-        let hash = paths.get(path)?;
-
-        Some((
-          mime_guess::from_path(path).first_or_octet_stream(),
-          self.files.get(hash).unwrap().clone(),
-        ))
-      }
+      Manifest::App { paths, .. } => Some((
+        mime_guess::from_path(path).first_or_octet_stream(),
+        self.files.get(paths.get(path)?).unwrap().clone(),
+      )),
       Manifest::Comic { pages } => Some((
         mime::IMAGE_JPEG,
         self
