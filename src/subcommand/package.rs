@@ -10,6 +10,44 @@ pub struct Package {
 
 impl Package {
   pub fn run(self) -> Result {
+    let paths = self.paths()?;
+
+    let metadata = Metadata::load(&self.root.join(Metadata::PATH))?;
+
+    let template = metadata.template(&self.root, &paths)?;
+
+    let hashes = self.hashes(paths)?;
+
+    self.write(hashes, template)?;
+
+    Ok(())
+  }
+
+  fn hashes(&self, paths: HashSet<Utf8PathBuf>) -> Result<HashMap<Utf8PathBuf, (Hash, u64)>> {
+    let mut hashes = HashMap::new();
+
+    for relative in paths {
+      let path = self.root.join(&relative);
+
+      let context = error::Io { path: &path };
+
+      let file = File::open(&path).context(context)?;
+
+      let len = file.metadata().context(context)?.len();
+
+      let mut hasher = Hasher::new();
+
+      hasher.update_reader(file).context(context)?;
+
+      let hash = hasher.finalize();
+
+      hashes.insert(relative.clone(), (hash, len));
+    }
+
+    Ok(hashes)
+  }
+
+  fn paths(&self) -> Result<HashSet<Utf8PathBuf>> {
     let mut paths = HashSet::new();
 
     for result in WalkDir::new(&self.root) {
@@ -32,68 +70,23 @@ impl Package {
     if !paths.contains(Utf8Path::new(Metadata::PATH)) {
       return Err(Error::MetadataMissing {
         backtrace: Backtrace::capture(),
-        root: self.root,
+        root: self.root.clone(),
       });
     }
 
-    let template = {
-      let path = self.root.join(Metadata::PATH);
+    Ok(paths)
+  }
 
-      let file = File::open(&path).context(error::Io { path: &path })?;
+  fn write(&self, hashes: HashMap<Utf8PathBuf, (Hash, u64)>, template: Template) -> Result {
+    let context = error::Io { path: &self.output };
 
-      let metadata: Metadata =
-        serde_yaml::from_reader(&file).context(error::DeserializeMetadata { path: &path })?;
-
-      metadata.template(&self.root, &paths)?
-    };
-
-    let mut hashes = HashMap::new();
-
-    for p in paths {
-      let path = self.root.join(&p);
-
-      let file = File::open(&path).context(error::Io { path: &path })?;
-
-      let len = file.metadata().context(error::Io { path: &path })?.len();
-
-      let mut hasher = Hasher::new();
-
-      hasher
-        .update_reader(file)
-        .context(error::Io { path: &path })?;
-
-      let hash = hasher.finalize();
-
-      hashes.insert(p, (hash, len));
-    }
-
-    let mut package =
-      BufWriter::new(File::create(&self.output).context(error::Io { path: &self.output })?);
+    let mut package = BufWriter::new(File::create(&self.output).context(context)?);
 
     let mut hashes_sorted = hashes.values().copied().collect::<Vec<(Hash, u64)>>();
 
     let manifest = {
-      let manifest = match template {
-        Template::App { handles } => {
-          let mut paths = BTreeMap::new();
-
-          for (path, (hash, _len)) in &hashes {
-            paths.insert(path.to_string(), *hash);
-          }
-
-          Manifest::App { handles, paths }
-        }
-        Template::Comic { pages } => Manifest::Comic {
-          pages: pages
-            .into_iter()
-            .map(|path| hashes.get(&path).unwrap().0)
-            .collect(),
-        },
-      };
-
       let mut buffer = Vec::new();
-      ciborium::into_writer(&manifest, &mut buffer).unwrap();
-
+      ciborium::into_writer(&template.manifest(&hashes), &mut buffer).unwrap();
       buffer
     };
 
@@ -109,21 +102,15 @@ impl Package {
       .unwrap()
       .into_u64();
 
-    package
-      .write_u64(manifest_index)
-      .context(error::Io { path: &self.output })?;
+    package.write_u64(manifest_index).context(context)?;
 
     package
       .write_u64(hashes_sorted.len().into_u64())
-      .context(error::Io { path: &self.output })?;
+      .context(context)?;
 
     for (hash, len) in &hashes_sorted {
-      package
-        .write_hash(*hash)
-        .context(error::Io { path: &self.output })?;
-      package
-        .write_u64(*len)
-        .context(error::Io { path: &self.output })?;
+      package.write_hash(*hash).context(context)?;
+      package.write_u64(*len).context(context)?;
     }
 
     let paths = hashes
@@ -133,13 +120,11 @@ impl Package {
 
     for (hash, _len) in hashes_sorted {
       if hash == manifest_hash {
-        package
-          .write_all(&manifest)
-          .context(error::Io { path: &self.output })?;
+        package.write_all(&manifest).context(context)?;
       } else {
         let path = self.root.join(paths.get(&hash).unwrap());
 
-        let mut file = File::open(&path).context(error::Io { path: &path })?;
+        let mut file = File::open(&path).context(context)?;
 
         io::copy(&mut file, &mut package).context(error::IoCopy {
           from: &path,

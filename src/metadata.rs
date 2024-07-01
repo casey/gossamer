@@ -10,6 +10,11 @@ pub enum Metadata {
 impl Metadata {
   pub const PATH: &'static str = "metadata.yaml";
 
+  pub fn load(path: &Utf8Path) -> Result<Self> {
+    serde_yaml::from_reader(&File::open(&path).context(error::Io { path })?)
+      .context(error::DeserializeMetadata { path })
+  }
+
   pub fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
     match self {
       Self::App { handles } => {
