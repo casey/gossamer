@@ -46,4 +46,39 @@ impl Package {
 
     Ok(Self { manifest, files })
   }
+
+  pub fn get(&self, path: &str) -> Option<(String, Vec<u8>)> {
+    match &self.manifest {
+      Manifest::App { paths, .. } => {
+        let Some(hash) = paths.get(path) else {
+          return None;
+        };
+
+        Some((
+          mime_guess::from_path(path)
+            .first_or_octet_stream()
+            .to_string(),
+          self.files.get(hash).unwrap().clone(),
+        ))
+      }
+      Manifest::Comic { pages } => {
+        if path == "index.html" {
+          let mut index = String::new();
+
+          for (i, _hash) in pages.iter().enumerate() {
+            index.push_str(&format!("<img src={i}>\n"));
+          }
+
+          Some(("text/html".into(), index.into_bytes()))
+        } else if let Ok(page) = path.parse::<usize>() {
+          Some((
+            "image/jpeg".into(),
+            self.files.get(&pages[page]).unwrap().clone(),
+          ))
+        } else {
+          return None;
+        }
+      }
+    }
+  }
 }

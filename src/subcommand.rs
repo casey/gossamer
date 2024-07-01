@@ -2,7 +2,7 @@ use {
   super::*,
   axum::{
     extract::{Extension, Path},
-    http::{header, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Response},
     routing::get,
     Router,

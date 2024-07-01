@@ -91,47 +91,11 @@ impl Server {
   }
 
   fn file(package: &Package, prefix: &str, path: &str) -> impl IntoResponse {
-    match &package.manifest {
-      Manifest::App { paths, .. } => {
-        let Some(hash) = paths.get(path) else {
-          return Err(ServerError::NotFound {
-            path: format!("{prefix}{path}"),
-          });
-        };
-
-        Ok((
-          [(
-            header::CONTENT_TYPE,
-            mime_guess::from_path(path)
-              .first_or_octet_stream()
-              .to_string(),
-          )],
-          package.files.get(hash).unwrap().clone(),
-        ))
-      }
-      Manifest::Comic { pages } => {
-        if path == "index.html" {
-          let mut index = String::new();
-
-          for (i, _hash) in pages.iter().enumerate() {
-            index.push_str(&format!("<img src={i}>\n"));
-          }
-
-          Ok((
-            [(header::CONTENT_TYPE, "text/html".to_string())],
-            index.into_bytes(),
-          ))
-        } else if let Ok(page) = path.parse::<usize>() {
-          Ok((
-            [(header::CONTENT_TYPE, "image/jpeg".to_string())],
-            package.files.get(&pages[page]).unwrap().clone(),
-          ))
-        } else {
-          return Err(ServerError::NotFound {
-            path: format!("{prefix}{path}"),
-          });
-        }
-      }
+    match package.get(path) {
+      Some((content_type, content)) => Ok(([(header::CONTENT_TYPE, content_type)], content)),
+      None => Err(ServerError::NotFound {
+        path: format!("{prefix}{path}"),
+      }),
     }
   }
 }
