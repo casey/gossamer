@@ -7,6 +7,17 @@ open:
 outdated:
   cargo outdated -R
 
+ci: clippy forbid
+  cargo fmt -- --check
+  cargo test --all
+  cargo test --all -- --ignored
+
+clippy:
+  cargo clippy --all --all-targets -- --deny warnings
+
+forbid:
+  ./bin/forbid
+
 serve:
   rm -rf tmp
   mkdir tmp

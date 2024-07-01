@@ -50,9 +50,7 @@ impl Package {
   pub fn get(&self, path: &str) -> Option<(String, Vec<u8>)> {
     match &self.manifest {
       Manifest::App { paths, .. } => {
-        let Some(hash) = paths.get(path) else {
-          return None;
-        };
+        let hash = paths.get(path)?;
 
         Some((
           mime_guess::from_path(path)
@@ -61,24 +59,14 @@ impl Package {
           self.files.get(hash).unwrap().clone(),
         ))
       }
-      Manifest::Comic { pages } => {
-        if path == "index.html" {
-          let mut index = String::new();
-
-          for (i, _hash) in pages.iter().enumerate() {
-            index.push_str(&format!("<img src={i}>\n"));
-          }
-
-          Some(("text/html".into(), index.into_bytes()))
-        } else if let Ok(page) = path.parse::<usize>() {
-          Some((
-            "image/jpeg".into(),
-            self.files.get(&pages[page]).unwrap().clone(),
-          ))
-        } else {
-          return None;
-        }
-      }
+      Manifest::Comic { pages } => Some((
+        "image/jpeg".into(),
+        self
+          .files
+          .get(pages.get(path.parse::<usize>().ok()?)?)
+          .unwrap()
+          .clone(),
+      )),
     }
   }
 }
