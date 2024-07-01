@@ -27,6 +27,24 @@ impl Server {
     let app = Package::load(&self.app)?;
     let content = Package::load(&self.content)?;
 
+    match app.manifest {
+      Manifest::App { handles, .. } => {
+        if content.manifest.ty() != handles {
+          return Err(Error::ContentType {
+            backtrace: Backtrace::capture(),
+            content: content.manifest.ty(),
+            app: handles,
+          });
+        }
+      }
+      _ => {
+        return Err(Error::AppType {
+          backtrace: Backtrace::capture(),
+          ty: app.manifest.ty(),
+        })
+      }
+    }
+
     Runtime::new().context(error::Runtime)?.block_on(async {
       axum_server::Server::bind(self.address)
         .serve(
@@ -74,7 +92,7 @@ impl Server {
 
   fn file(package: &Package, prefix: &str, path: &str) -> impl IntoResponse {
     match &package.manifest {
-      Manifest::App { paths } => {
+      Manifest::App { paths, .. } => {
         let Some(hash) = paths.get(path) else {
           return Err(ServerError::NotFound {
             path: format!("{prefix}{path}"),

@@ -1,6 +1,6 @@
 use super::*;
 
 pub enum Template {
-  App,
+  App { handles: Type },
   Comic { pages: Vec<Utf8PathBuf> },
 }

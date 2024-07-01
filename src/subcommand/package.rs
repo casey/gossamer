@@ -44,17 +44,17 @@ impl Package {
       let metadata: Metadata =
         serde_yaml::from_reader(&file).context(error::DeserializeMetadata { path: &path })?;
 
-      match metadata.ty {
-        Type::App => {
+      match metadata {
+        Metadata::App { handles } => {
           if !paths.contains(Utf8Path::new("index.html")) {
             return Err(Error::Index {
               backtrace: Backtrace::capture(),
               root: self.root,
             });
           };
-          Template::App
+          Template::App { handles }
         }
-        Type::Comic => {
+        Metadata::Comic => {
           let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();
 
           let page_re = Regex::new(r"^(\d+)\.jpg$").unwrap();
@@ -68,7 +68,7 @@ impl Package {
               .captures(path.as_ref())
               .context(error::UnexpectedFile {
                 file: path.clone(),
-                ty: metadata.ty,
+                ty: metadata.ty(),
               })?;
 
             pages.push((
@@ -132,14 +132,14 @@ impl Package {
 
     let manifest = {
       let manifest = match template {
-        Template::App => {
+        Template::App { handles } => {
           let mut paths = BTreeMap::new();
 
           for (path, (hash, _len)) in &hashes {
             paths.insert(path.to_string(), *hash);
           }
 
-          Manifest::App { paths }
+          Manifest::App { handles, paths }
         }
         Template::Comic { pages } => Manifest::Comic {
           pages: pages
