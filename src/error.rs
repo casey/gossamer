@@ -8,8 +8,14 @@ pub enum Error {
     backtrace: Backtrace,
     source: io::Error,
   },
-  #[snafu(display("failed to get deserialize `{path}` as YAML"))]
-  DeserializeYaml {
+  #[snafu(display("failed to deserialize manifest in package `{path}`"))]
+  DeserializeManifest {
+    backtrace: Backtrace,
+    path: Utf8PathBuf,
+    source: ciborium::de::Error<io::Error>,
+  },
+  #[snafu(display("failed to deserialize YAML package metadata at `{path}`"))]
+  DeserializeMetadata {
     backtrace: Backtrace,
     path: Utf8PathBuf,
     source: serde_yaml::Error,

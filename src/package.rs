@@ -8,9 +8,9 @@ pub struct Package {
 
 impl Package {
   pub fn load(path: &Utf8Path) -> Result<Self> {
-    let context = error::Io { path: &path };
+    let context = error::Io { path };
 
-    let mut package = BufReader::new(File::open(&path).context(context)?);
+    let mut package = BufReader::new(File::open(path).context(context)?);
 
     let manifest_index = package.read_u64().context(context)?;
 
@@ -41,8 +41,8 @@ impl Package {
       files.insert(hash, buffer);
     }
 
-    let manifest: Manifest =
-      ciborium::from_reader(Cursor::new(files.get(&manifest.unwrap()).unwrap())).unwrap();
+    let manifest = ciborium::from_reader(Cursor::new(files.get(&manifest.unwrap()).unwrap()))
+      .context(error::DeserializeManifest { path })?;
 
     Ok(Self { manifest, files })
   }

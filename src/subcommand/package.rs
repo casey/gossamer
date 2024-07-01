@@ -79,7 +79,7 @@ impl Package {
       let file = File::open(&path).context(error::Io { path: &path })?;
 
       let metadata: Metadata =
-        serde_yaml::from_reader(&file).context(error::DeserializeYaml { path: &path })?;
+        serde_yaml::from_reader(&file).context(error::DeserializeMetadata { path: &path })?;
 
       match metadata.ty {
         Type::App => {
