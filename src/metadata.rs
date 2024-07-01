@@ -27,7 +27,7 @@ impl Metadata {
       Self::Comic => {
         let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();
 
-        let page_re = Regex::new(r"^(\d+)\.jpg$").unwrap();
+        let page_re = Regex::new(r"^([1-9]\d*|0)\.jpg$").unwrap();
 
         for path in paths {
           if path == Metadata::PATH {
