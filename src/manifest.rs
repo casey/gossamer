@@ -30,18 +30,19 @@ impl Manifest {
     };
 
     for hash in &expected {
-      if !files.contains_key(&hash) {
+      if !files.contains_key(hash) {
         missing += 1;
       }
     }
 
-    for (hash, _) in files {
+    ensure!(missing == 0, package::ManifestMissingFiles { missing });
+
+    for hash in files.keys() {
       if !expected.contains(hash) {
         extra += 1;
       }
     }
 
-    ensure!(missing == 0, package::ManifestMissingFiles { missing });
     ensure!(extra == 0, package::ManifestExtraFiles { extra });
 
     Ok(())
