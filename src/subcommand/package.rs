@@ -10,13 +10,13 @@ pub struct Package {
 
 impl Package {
   pub fn run(self) -> Result {
-    if self.output.starts_with(&self.root) {
-      return Err(Error::OutputInRoot {
-        backtrace: Backtrace::capture(),
+    ensure!(
+      !self.output.starts_with(&self.root),
+      error::OutputInRoot {
         output: self.output,
         root: self.root,
-      });
-    }
+      }
+    );
 
     let metadata = Metadata::load(&self.root.join(Metadata::PATH))?;
 
@@ -75,12 +75,12 @@ impl Package {
       );
     }
 
-    if !paths.contains(Utf8Path::new(Metadata::PATH)) {
-      return Err(Error::MetadataMissing {
-        backtrace: Backtrace::capture(),
+    ensure!(
+      paths.contains(Utf8Path::new(Metadata::PATH)),
+      error::MetadataMissing {
         root: self.root.clone(),
-      });
-    }
+      }
+    );
 
     Ok(paths)
   }

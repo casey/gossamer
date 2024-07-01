@@ -8,13 +8,19 @@ pub enum Error {
     backtrace: Backtrace,
     source: ciborium::de::Error<io::Error>,
   },
-  #[snafu(display("I/O error reading package"))]
+  #[snafu(display("I/O error reading package"), context(false))]
   Io {
     backtrace: Backtrace,
     source: io::Error,
   },
   #[snafu(display("package file hash `{hash}` duplicated"))]
   FileHashDuplicated { hash: Hash, backtrace: Backtrace },
+  #[snafu(display("package file length `{len}` cannot be converted to usize"))]
+  FileLengthRange {
+    backtrace: Backtrace,
+    len: u64,
+    source: TryFromIntError,
+  },
   #[snafu(display("package file hash `{hash}` out of order"))]
   FileHashOrder { hash: Hash, backtrace: Backtrace },
   #[snafu(display("package file hash actually `{actual}` but expected `{expected}`"))]
@@ -34,11 +40,12 @@ pub enum Error {
   },
   #[snafu(display("package has trailing {trailing} bytes"))]
   TrailingBytes { backtrace: Backtrace, trailing: u64 },
-  #[snafu(display("manifest index out of bounds of hash array"))]
-  ManifestIndexOutOfBounds { backtrace: Backtrace },
-  #[snafu(display("could not convert manifest index to usize"))]
+  #[snafu(display("manifest index {index} out of bounds of hash array"))]
+  ManifestIndexOutOfBounds { backtrace: Backtrace, index: usize },
+  #[snafu(display("could not convert manifest index {index} to usize"))]
   ManifestIndexRange {
     backtrace: Backtrace,
+    index: u64,
     source: TryFromIntError,
   },
 }
@@ -53,42 +60,38 @@ impl Package {
   pub const MAGIC_BYTES: &'static str = "MEDIA📦\0";
 
   pub fn load(path: &Utf8Path) -> Result<Self, Error> {
-    let file = File::open(path).context(Io)?;
+    let file = File::open(path)?;
 
-    let len = file.metadata().context(Io)?.len();
+    let len = file.metadata()?.len();
 
     let mut package = BufReader::new(file);
 
     let mut magic = [0; Self::MAGIC_BYTES.len()];
 
-    package.read_exact(&mut magic).context(Io)?;
+    package.read_exact(&mut magic)?;
 
-    if magic != Self::MAGIC_BYTES.as_bytes() {
-      return Err(Error::MagicBytes {
-        backtrace: Backtrace::capture(),
-        magic,
-      });
-    }
+    ensure!(magic == Self::MAGIC_BYTES.as_bytes(), MagicBytes { magic });
 
-    let manifest_index =
-      usize::try_from(package.read_u64().context(Io)?).context(ManifestIndexRange)?;
+    let index = package.read_u64()?;
 
-    let hash_count = package.read_u64().context(Io)?;
+    let index = usize::try_from(index).context(ManifestIndexRange { index })?;
+
+    let hash_count = package.read_u64()?;
 
     let mut hashes = Vec::new();
 
     for _ in 0..hash_count {
-      let hash = package.read_hash().context(Io)?;
-      let len = package.read_u64().context(Io)?;
+      let hash = package.read_hash()?;
+      let len = package.read_u64()?;
 
-      // usize::try_from(len);
+      usize::try_from(len).context(FileLengthRange { len })?;
 
       hashes.push((hash, len));
     }
 
     let manifest = hashes
-      .get(manifest_index)
-      .context(ManifestIndexOutOfBounds)?
+      .get(index)
+      .context(ManifestIndexOutOfBounds { index })?
       .0;
 
     let mut files = HashMap::<Hash, Vec<u8>>::new();
@@ -97,48 +100,38 @@ impl Package {
 
     for (expected, len) in hashes {
       if let Some(last) = last {
-        if expected.as_bytes() < last.as_bytes() {
-          return Err(Error::FileHashOrder {
-            backtrace: Backtrace::capture(),
-            hash: expected,
-          });
-        }
+        ensure!(
+          expected.as_bytes() >= last.as_bytes(),
+          FileHashOrder { hash: expected }
+        );
 
-        if expected.as_bytes() == last.as_bytes() {
-          return Err(Error::FileHashDuplicated {
-            backtrace: Backtrace::capture(),
-            hash: expected,
-          });
-        }
+        ensure!(
+          expected.as_bytes() != last.as_bytes(),
+          FileHashDuplicated { hash: expected }
+        );
       }
 
       last = Some(expected);
 
       let mut buffer = vec![0; len as usize];
 
-      package.read_exact(&mut buffer).context(Io)?;
+      package.read_exact(&mut buffer)?;
 
       let actual = blake3::hash(&buffer);
 
-      if actual != expected {
-        return Err(Error::FileHashInvalid {
-          backtrace: Backtrace::capture(),
-          expected,
-          actual,
-        });
-      }
+      ensure!(actual == expected, FileHashInvalid { expected, actual });
 
       files.insert(expected, buffer);
     }
 
-    let position = package.stream_position().context(Io)?;
+    let position = package.stream_position()?;
 
-    if position != len {
-      return Err(Error::TrailingBytes {
-        backtrace: Backtrace::capture(),
+    ensure!(
+      position == len,
+      TrailingBytes {
         trailing: len.saturating_sub(position),
-      });
-    }
+      }
+    );
 
     let manifest = ciborium::from_reader(Cursor::new(files.get(&manifest).unwrap()))
       .context(DeserializeManifest)?;

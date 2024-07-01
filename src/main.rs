@@ -13,7 +13,7 @@ use {
   libc::EXIT_FAILURE,
   regex::Regex,
   serde::{Deserialize, Serialize},
-  snafu::{Backtrace, ErrorCompat, OptionExt, ResultExt, Snafu},
+  snafu::{ensure, Backtrace, ErrorCompat, OptionExt, ResultExt, Snafu},
   std::{
     backtrace::BacktraceStatus,
     collections::{BTreeMap, HashMap, HashSet},

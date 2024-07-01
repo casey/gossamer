@@ -17,9 +17,9 @@ pub trait PathBufExt {
 
 impl PathBufExt for PathBuf {
   fn try_into_utf8(self) -> Result<Utf8PathBuf> {
-    Utf8PathBuf::from_path_buf(self).map_err(|path| Error::PathUnicode {
-      path,
-      backtrace: Backtrace::capture(),
-    })
+    match Utf8PathBuf::from_path_buf(self) {
+      Ok(path) => Ok(path),
+      Err(path) => Err(error::PathUnicode { path }.build()),
+    }
   }
 }

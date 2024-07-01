@@ -18,12 +18,10 @@ impl Metadata {
   pub fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
     match self {
       Self::App { handles } => {
-        if !paths.contains(Utf8Path::new("index.html")) {
-          return Err(Error::Index {
-            backtrace: Backtrace::capture(),
-            root: root.into(),
-          });
-        };
+        ensure!(
+          paths.contains(Utf8Path::new("index.html")),
+          error::Index { root }
+        );
         Ok(Template::App { handles })
       }
       Self::Comic => {
@@ -55,19 +53,8 @@ impl Metadata {
           let i = i.into_u64();
           let page = *page;
 
-          if i < page {
-            return Err(Error::PageMissing {
-              backtrace: Backtrace::capture(),
-              page: i,
-            });
-          }
-
-          if i > page {
-            return Err(Error::PageDuplicated {
-              backtrace: Backtrace::capture(),
-              page,
-            });
-          }
+          ensure!(i >= page, error::PageMissing { page: i });
+          ensure!(i <= page, error::PageDuplicated { page });
         }
 
         Ok(Template::Comic {

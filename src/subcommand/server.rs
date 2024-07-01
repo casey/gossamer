@@ -29,19 +29,19 @@ impl Server {
 
     match app.manifest {
       Manifest::App { handles, .. } => {
-        if content.manifest.ty() != handles {
-          return Err(Error::ContentType {
-            backtrace: Backtrace::capture(),
+        ensure!(
+          content.manifest.ty() == handles,
+          error::ContentType {
             content: content.manifest.ty(),
             app: handles,
-          });
-        }
+          }
+        );
       }
       _ => {
-        return Err(Error::AppType {
-          backtrace: Backtrace::capture(),
+        return error::AppType {
           ty: app.manifest.ty(),
-        })
+        }
+        .fail()
       }
     }
 
