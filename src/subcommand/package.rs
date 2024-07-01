@@ -167,24 +167,7 @@ mod tests {
       .run();
 
       if let Err(err) = result {
-        eprintln!("error packaging {root}: {err}");
-
-        for (i, err) in err.iter_chain().skip(1).enumerate() {
-          if i == 0 {
-            eprintln!();
-            eprintln!("because:");
-          }
-
-          eprintln!("- {err}");
-        }
-
-        if let Some(backtrace) = err.backtrace() {
-          if backtrace.status() == BacktraceStatus::Captured {
-            eprintln!("backtrace:");
-            eprintln!("{backtrace}");
-          }
-        }
-
+        err.report();
         panic!("packaging {root} failed");
       }
     }

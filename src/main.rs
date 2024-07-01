@@ -43,11 +43,11 @@ mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
-fn main() {
-  if let Err(err) = Subcommand::parse().run() {
-    eprintln!("error: {err}");
+impl Error {
+  fn report(&self) {
+    eprintln!("error: {self}");
 
-    for (i, err) in err.iter_chain().skip(1).enumerate() {
+    for (i, err) in self.iter_chain().skip(1).enumerate() {
       if i == 0 {
         eprintln!();
         eprintln!("because:");
@@ -56,14 +56,19 @@ fn main() {
       eprintln!("- {err}");
     }
 
-    if let Some(backtrace) = err.backtrace() {
+    if let Some(backtrace) = self.backtrace() {
       if backtrace.status() == BacktraceStatus::Captured {
         eprintln!();
         eprintln!("backtrace:");
         eprintln!("{backtrace}");
       }
     }
+  }
+}
 
+fn main() {
+  if let Err(err) = Subcommand::parse().run() {
+    err.report();
     process::exit(EXIT_FAILURE)
   }
 }
