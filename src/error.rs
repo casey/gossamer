@@ -65,7 +65,15 @@ pub enum Error {
     output: Utf8PathBuf,
     root: Utf8PathBuf,
   },
-  #[snafu(display("muliple page {page}s"))]
+  #[snafu(display("package file hash actually `{actual}` but expected `{expected}`"))]
+  PackageFileHash {
+    actual: Hash,
+    backtrace: Backtrace,
+    expected: Hash,
+  },
+  #[snafu(display("package has trailing {trailing} bytes"))]
+  PackageTrailingBytes { backtrace: Backtrace, trailing: u64 },
+  #[snafu(display("multiple page {page}s"))]
   PageDuplicated { backtrace: Backtrace, page: u64 },
   #[snafu(display("page {page} missing"))]
   PageMissing { backtrace: Backtrace, page: u64 },
@@ -89,6 +97,17 @@ pub enum Error {
     backtrace: Backtrace,
     file: Utf8PathBuf,
     ty: Type,
+  },
+  #[snafu(display("manifest index out of bounds of hash array"))]
+  ManifestIndexOutOfBounds {
+    backtrace: Backtrace,
+    package: Utf8PathBuf,
+  },
+  #[snafu(display("could not convert manifest index to usize"))]
+  ManifestIndexRange {
+    backtrace: Backtrace,
+    package: Utf8PathBuf,
+    source: TryFromIntError,
   },
   #[snafu(display("failed to walk directory `{root}`"))]
   WalkDir {
