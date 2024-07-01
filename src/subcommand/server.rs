@@ -24,8 +24,8 @@ struct State {
 
 impl Server {
   pub fn run(self) -> Result {
-    let app = Package::load(&self.app)?;
-    let content = Package::load(&self.content)?;
+    let app = Package::load(&self.app).context(error::PackageLoad { path: &self.app })?;
+    let content = Package::load(&self.content).context(error::PackageLoad { path: &self.app })?;
 
     match app.manifest {
       Manifest::App { handles, .. } => {
