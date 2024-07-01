@@ -10,6 +10,14 @@ pub struct Package {
 
 impl Package {
   pub fn run(self) -> Result {
+    if self.output.starts_with(&self.root) {
+      return Err(Error::OutputInRoot {
+        backtrace: Backtrace::capture(),
+        output: self.output,
+        root: self.root,
+      });
+    }
+
     let metadata = Metadata::load(&self.root.join(Metadata::PATH))?;
 
     let paths = self.paths()?;

@@ -59,6 +59,12 @@ pub enum Error {
     backtrace: Backtrace,
     root: Utf8PathBuf,
   },
+  #[snafu(display("package output `{output}` may not be in `{root}`"))]
+  OutputInRoot {
+    backtrace: Backtrace,
+    output: Utf8PathBuf,
+    root: Utf8PathBuf,
+  },
   #[snafu(display("muliple page {page}s"))]
   PageDuplicated { backtrace: Backtrace, page: u64 },
   #[snafu(display("page {page} missing"))]
