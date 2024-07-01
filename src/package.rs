@@ -8,26 +8,26 @@ pub enum Error {
     backtrace: Backtrace,
     source: ciborium::de::Error<io::Error>,
   },
-  #[snafu(display("I/O error reading package"), context(false))]
-  Io {
-    backtrace: Backtrace,
-    source: io::Error,
-  },
   #[snafu(display("package file hash `{hash}` duplicated"))]
   FileHashDuplicated { hash: Hash, backtrace: Backtrace },
+  #[snafu(display("package file hash actually `{actual}` but expected `{expected}`"))]
+  FileHashInvalid {
+    actual: Hash,
+    backtrace: Backtrace,
+    expected: Hash,
+  },
+  #[snafu(display("package file hash `{hash}` out of order"))]
+  FileHashOrder { hash: Hash, backtrace: Backtrace },
   #[snafu(display("package file length `{len}` cannot be converted to usize"))]
   FileLengthRange {
     backtrace: Backtrace,
     len: u64,
     source: TryFromIntError,
   },
-  #[snafu(display("package file hash `{hash}` out of order"))]
-  FileHashOrder { hash: Hash, backtrace: Backtrace },
-  #[snafu(display("package file hash actually `{actual}` but expected `{expected}`"))]
-  FileHashInvalid {
-    actual: Hash,
+  #[snafu(transparent)]
+  Io {
     backtrace: Backtrace,
-    expected: Hash,
+    source: io::Error,
   },
   #[snafu(display(
     "unexpected package magic bytes {} (\"{}\")",
@@ -38,8 +38,6 @@ pub enum Error {
     backtrace: Backtrace,
     magic: [u8; 10],
   },
-  #[snafu(display("package has trailing {trailing} bytes"))]
-  TrailingBytes { backtrace: Backtrace, trailing: u64 },
   #[snafu(display("manifest index {index} out of bounds of hash array"))]
   ManifestIndexOutOfBounds { backtrace: Backtrace, index: usize },
   #[snafu(display("could not convert manifest index {index} to usize"))]
@@ -48,6 +46,8 @@ pub enum Error {
     index: u64,
     source: TryFromIntError,
   },
+  #[snafu(display("package has trailing {trailing} bytes"))]
+  TrailingBytes { backtrace: Backtrace, trailing: u64 },
 }
 
 #[derive(Debug)]
