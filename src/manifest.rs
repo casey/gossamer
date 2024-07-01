@@ -24,28 +24,20 @@ impl Manifest {
     let mut extra = 0u64;
     let mut missing = 0u64;
 
-    match self {
-      Self::App { paths, .. } => {
-        for (_, hash) in paths {
-          if !files.contains_key(hash) {
-            missing += 1;
-          }
-        }
+    let expected: HashSet<Hash> = match self {
+      Self::App { paths, .. } => paths.values().copied().collect(),
+      Self::Comic { pages } => pages.iter().copied().collect(),
+    };
+
+    for hash in &expected {
+      if !files.contains_key(&hash) {
+        missing += 1;
       }
-      Self::Comic { pages } => {
-        for hash in pages {
-          if !files.contains_key(hash) {
-            missing += 1;
-          }
-        }
+    }
 
-        let pages = pages.iter().copied().collect::<HashSet<Hash>>();
-
-        for (hash, _) in files {
-          if !pages.contains(hash) {
-            extra += 1;
-          }
-        }
+    for (hash, _) in files {
+      if !expected.contains(hash) {
+        extra += 1;
       }
     }
 
