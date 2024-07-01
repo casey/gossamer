@@ -7,6 +7,8 @@ pub struct Package {
 }
 
 impl Package {
+  pub const MAGIC_BYTES: &'static str = "MEDIA📦\n";
+
   pub fn load(path: &Utf8Path) -> Result<Self> {
     let context = error::Io { path };
 
@@ -15,6 +17,17 @@ impl Package {
     let len = file.metadata().context(context)?.len();
 
     let mut package = BufReader::new(file);
+
+    let mut magic = [0; Self::MAGIC_BYTES.len()];
+
+    package.read_exact(&mut magic).context(context)?;
+
+    if magic != Self::MAGIC_BYTES.as_bytes() {
+      return Err(Error::PackageMagicBytes {
+        backtrace: Backtrace::capture(),
+        magic,
+      });
+    }
 
     let manifest_index = usize::try_from(package.read_u64().context(context)?)
       .context(error::ManifestIndexRange { package: &path })?;

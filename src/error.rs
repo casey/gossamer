@@ -71,6 +71,15 @@ pub enum Error {
     backtrace: Backtrace,
     expected: Hash,
   },
+  #[snafu(display(
+    "unexpected package magic bytes {} (\"{}\")",
+    hex::encode(magic),
+    String::from_utf8_lossy(magic)
+  ))]
+  PackageMagicBytes {
+    backtrace: Backtrace,
+    magic: [u8; 10],
+  },
   #[snafu(display("package has trailing {trailing} bytes"))]
   PackageTrailingBytes { backtrace: Backtrace, trailing: u64 },
   #[snafu(display("multiple page {page}s"))]

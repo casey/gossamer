@@ -90,6 +90,10 @@ impl Package {
 
     let mut package = BufWriter::new(File::create(&self.output).context(context)?);
 
+    package
+      .write_all(crate::package::Package::MAGIC_BYTES.as_bytes())
+      .context(context)?;
+
     let mut hashes_sorted = hashes.values().copied().collect::<Vec<(Hash, u64)>>();
 
     let manifest = {
