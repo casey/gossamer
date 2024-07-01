@@ -58,6 +58,7 @@ fn main() {
 
     if let Some(backtrace) = err.backtrace() {
       if backtrace.status() == BacktraceStatus::Captured {
+        eprintln!();
         eprintln!("backtrace:");
         eprintln!("{backtrace}");
       }
