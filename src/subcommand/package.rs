@@ -1,5 +1,6 @@
 use super::*;
 
+// todo:
 // show an error if it's the wrong kind of manifest
 //
 // i feel like i shouldn't just commit content
