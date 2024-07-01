@@ -7,7 +7,7 @@ pub struct Package {
 }
 
 impl Package {
-  pub const MAGIC_BYTES: &'static str = "MEDIA📦\n";
+  pub const MAGIC_BYTES: &'static str = "MEDIA📦\0";
 
   pub fn load(path: &Utf8Path) -> Result<Self> {
     let context = error::Io { path };
