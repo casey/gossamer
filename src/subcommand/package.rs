@@ -1,43 +1,5 @@
 use super::*;
 
-// todo:
-// show an error if it's the wrong kind of manifest
-//
-// i feel like i shouldn't just commit content
-// - generate content, works okay for jpegs
-// - commit content: works as long as they're small
-
-// gallery is:
-// - title
-// - isbn
-// - series
-// - volume
-// - part
-// - artists
-// - publisher
-// - original language
-// - translation language
-// - source: digital or scan
-//
-// - files must all be same format
-// - files must all be same size, double pages allowed
-// - files must be recognized format: jpg
-//
-// manga/comic
-// movie
-// videos
-// tv show
-// music
-// console games
-//
-// music
-// videos
-// movies / tv shows
-//
-// // check that they're actually JPGs
-// // - check magic number
-// // - deserialize
-
 #[derive(Parser)]
 pub struct Package {
   #[arg(long, help = "Package contents of directory <ROOT>.")]
@@ -240,7 +202,6 @@ impl Package {
 
         let mut file = File::open(&path).context(error::Io { path: &path })?;
 
-        // todo: check that we're not copying from package
         io::copy(&mut file, &mut package).context(error::IoCopy {
           from: &path,
           to: &self.output,
