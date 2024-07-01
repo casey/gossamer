@@ -1,5 +1,9 @@
 use super::*;
 
+// todo:
+// - package tests
+// - serve tests
+
 #[derive(Parser)]
 pub struct Package {
   #[arg(long, help = "Package contents of directory <ROOT>.")]
@@ -28,7 +32,7 @@ impl Package {
 
     let manifest = template.manifest(&hashes);
 
-    crate::package::Package::save(hashes, manifest, &self.output, &self.root)
+    super::Package::save(hashes, manifest, &self.output, &self.root)
       .context(error::PackageSave { path: &self.output })?;
 
     Ok(())

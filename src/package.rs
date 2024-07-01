@@ -165,7 +165,7 @@ impl Package {
   ) -> Result<(), Error> {
     let mut package = BufWriter::new(File::create(output)?);
 
-    package.write_all(crate::package::Package::MAGIC_BYTES.as_bytes())?;
+    package.write_all(super::Package::MAGIC_BYTES.as_bytes())?;
 
     let paths = hashes
       .iter()
