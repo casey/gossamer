@@ -5,9 +5,10 @@ class App {
   constructor() {
     let html = '';
 
-    let pages = manifest['Comic'].pages.length;
-
-    for (let i = 0; i < pages; i++) {
+    for (let i = 0; i < manifest.pages.length; i++) {
+      if (i > 0) {
+        html += '\n';
+      }
       html += `<img src=content/${i}>`
     }
 
