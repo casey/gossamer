@@ -197,22 +197,22 @@ impl Package {
 
     let manifest_hash = blake3::hash(&manifest);
 
-    hashes_sorted.push((manifest_hash, manifest.len() as u64));
+    hashes_sorted.push((manifest_hash, manifest.len().into_u64()));
 
     hashes_sorted.sort_by_key(|hash| *hash.0.as_bytes());
 
-    // todo: replace with as u64 with something else
     let manifest_index = hashes_sorted
       .iter()
       .position(|(hash, _len)| *hash == manifest_hash)
-      .unwrap() as u64;
+      .unwrap()
+      .into_u64();
 
     package
       .write_u64(manifest_index)
       .context(error::Io { path: &self.output })?;
 
     package
-      .write_u64(hashes_sorted.len() as u64)
+      .write_u64(hashes_sorted.len().into_u64())
       .context(error::Io { path: &self.output })?;
 
     for (hash, len) in &hashes_sorted {
