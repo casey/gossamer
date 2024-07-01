@@ -91,8 +91,10 @@ impl Server {
   }
 
   fn file(package: &Package, prefix: &str, path: &str) -> impl IntoResponse {
-    match package.get(path) {
-      Some((content_type, content)) => Ok(([(header::CONTENT_TYPE, content_type)], content)),
+    match package.file(path) {
+      Some((content_type, content)) => {
+        Ok(([(header::CONTENT_TYPE, content_type.to_string())], content))
+      }
       None => Err(ServerError::NotFound {
         path: format!("{prefix}{path}"),
       }),

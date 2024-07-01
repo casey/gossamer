@@ -11,6 +11,7 @@ use {
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
   libc::EXIT_FAILURE,
+  mime_guess::{mime, Mime},
   regex::Regex,
   serde::{Deserialize, Serialize},
   snafu::{ensure, Backtrace, ErrorCompat, OptionExt, ResultExt, Snafu},

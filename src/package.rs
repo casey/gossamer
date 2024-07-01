@@ -139,20 +139,18 @@ impl Package {
     Ok(Self { manifest, files })
   }
 
-  pub fn get(&self, path: &str) -> Option<(String, Vec<u8>)> {
+  pub fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
     match &self.manifest {
       Manifest::App { paths, .. } => {
         let hash = paths.get(path)?;
 
         Some((
-          mime_guess::from_path(path)
-            .first_or_octet_stream()
-            .to_string(),
+          mime_guess::from_path(path).first_or_octet_stream(),
           self.files.get(hash).unwrap().clone(),
         ))
       }
       Manifest::Comic { pages } => Some((
-        "image/jpeg".into(),
+        mime::IMAGE_JPEG,
         self
           .files
           .get(pages.get(path.parse::<usize>().ok()?)?)
