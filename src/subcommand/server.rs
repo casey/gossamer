@@ -55,36 +55,29 @@ impl Server {
   }
 
   async fn root(Extension(state): Extension<Arc<State>>) -> impl IntoResponse {
-    Self::file(&state.app, "index.html")
+    Self::file(&state.app, "", "index.html")
   }
 
   async fn app(
     Extension(state): Extension<Arc<State>>,
     Path(path): Path<String>,
   ) -> impl IntoResponse {
-    Self::file(&state.app, &path)
+    Self::file(&state.app, "/app/", &path)
   }
 
   async fn content(
     Extension(state): Extension<Arc<State>>,
     Path(path): Path<String>,
   ) -> impl IntoResponse {
-    Self::file(&state.content, &path)
+    Self::file(&state.content, "/content/", &path)
   }
 
-  // async fn path(
-  //   Extension(state): Extension<Arc<State>>,
-  //   Path(path): Path<String>,
-  // ) -> impl IntoResponse {
-  //   Self::file(&state, &path)
-  // }
-
-  fn file(package: &Package, path: &str) -> impl IntoResponse {
+  fn file(package: &Package, prefix: &str, path: &str) -> impl IntoResponse {
     match &package.manifest {
       Manifest::App { paths } => {
         let Some(hash) = paths.get(path) else {
           return Err(ServerError::NotFound {
-            path: format!("/{path}"),
+            path: format!("{prefix}{path}"),
           });
         };
 
@@ -110,14 +103,14 @@ impl Server {
             [(header::CONTENT_TYPE, "text/html".to_string())],
             index.into_bytes(),
           ))
-        } else if let Some(page) = path.parse::<usize>().ok() {
+        } else if let Ok(page) = path.parse::<usize>() {
           Ok((
             [(header::CONTENT_TYPE, "image/jpeg".to_string())],
             package.files.get(&pages[page]).unwrap().clone(),
           ))
         } else {
           return Err(ServerError::NotFound {
-            path: format!("/{path}"),
+            path: format!("{prefix}{path}"),
           });
         }
       }

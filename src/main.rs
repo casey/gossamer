@@ -1,3 +1,5 @@
+#![allow(clippy::result_large_err)]
+
 use {
   self::{
     error::Error, into_u64::IntoU64, manifest::Manifest, metadata::Metadata, package::Package,

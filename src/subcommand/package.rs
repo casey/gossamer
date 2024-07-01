@@ -128,10 +128,7 @@ impl Package {
     let mut package =
       BufWriter::new(File::create(&self.output).context(error::Io { path: &self.output })?);
 
-    let mut hashes_sorted = hashes
-      .iter()
-      .map(|(_path, hash)| *hash)
-      .collect::<Vec<(Hash, u64)>>();
+    let mut hashes_sorted = hashes.values().copied().collect::<Vec<(Hash, u64)>>();
 
     let manifest = {
       let manifest = match template {
