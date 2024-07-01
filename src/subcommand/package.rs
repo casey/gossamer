@@ -1,9 +1,5 @@
 use super::*;
 
-// todo:
-// - package tests
-// - serve tests
-
 #[derive(Parser)]
 pub struct Package {
   #[arg(long, help = "Package contents of directory <ROOT>.")]
