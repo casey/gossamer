@@ -86,66 +86,8 @@ impl Package {
   }
 
   fn write(&self, hashes: HashMap<Utf8PathBuf, (Hash, u64)>, template: Template) -> Result {
-    let context = error::Io { path: &self.output };
-
-    let mut package = BufWriter::new(File::create(&self.output).context(context)?);
-
-    package
-      .write_all(crate::package::Package::MAGIC_BYTES.as_bytes())
-      .context(context)?;
-
-    let mut hashes_sorted = hashes.values().copied().collect::<Vec<(Hash, u64)>>();
-
-    let manifest = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&template.manifest(&hashes), &mut buffer).unwrap();
-      buffer
-    };
-
-    let manifest_hash = blake3::hash(&manifest);
-
-    hashes_sorted.push((manifest_hash, manifest.len().into_u64()));
-
-    hashes_sorted.sort_by_key(|hash| *hash.0.as_bytes());
-
-    let manifest_index = hashes_sorted
-      .iter()
-      .position(|(hash, _len)| *hash == manifest_hash)
-      .unwrap()
-      .into_u64();
-
-    package.write_u64(manifest_index).context(context)?;
-
-    package
-      .write_u64(hashes_sorted.len().into_u64())
-      .context(context)?;
-
-    for (hash, len) in &hashes_sorted {
-      package.write_hash(*hash).context(context)?;
-      package.write_u64(*len).context(context)?;
-    }
-
-    let paths = hashes
-      .into_iter()
-      .map(|(path, (hash, _len))| (hash, path))
-      .collect::<HashMap<Hash, Utf8PathBuf>>();
-
-    for (hash, _len) in hashes_sorted {
-      if hash == manifest_hash {
-        package.write_all(&manifest).context(context)?;
-      } else {
-        let path = self.root.join(paths.get(&hash).unwrap());
-
-        let mut file = File::open(&path).context(context)?;
-
-        io::copy(&mut file, &mut package).context(error::IoCopy {
-          from: &path,
-          to: &self.output,
-        })?;
-      }
-    }
-
-    Ok(())
+    crate::package::Package::save(&self.root, &self.output, hashes, template)
+      .context(error::PackageSave { path: &self.output })
   }
 }
 

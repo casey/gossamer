@@ -41,13 +41,6 @@ pub enum Error {
     path: Utf8PathBuf,
     source: io::Error,
   },
-  #[snafu(display("I/O error copying from `{from}` to `{to}"))]
-  IoCopy {
-    backtrace: Backtrace,
-    from: Utf8PathBuf,
-    source: io::Error,
-    to: Utf8PathBuf,
-  },
   #[snafu(display("missing `metadata.yaml` in `{root}`"))]
   MetadataMissing {
     backtrace: Backtrace,
@@ -61,6 +54,12 @@ pub enum Error {
   },
   #[snafu(display("failed to load package `{path}`"))]
   PackageLoad {
+    path: Utf8PathBuf,
+    #[snafu(backtrace)]
+    source: package::Error,
+  },
+  #[snafu(display("failed to save package to `{path}`"))]
+  PackageSave {
     path: Utf8PathBuf,
     #[snafu(backtrace)]
     source: package::Error,
