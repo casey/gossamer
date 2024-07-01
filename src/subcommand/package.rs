@@ -144,3 +144,45 @@ impl Package {
     Ok(())
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn package() {
+    for root in ["apps/comic", "content/comic"] {
+      let tempdir = tempfile::tempdir().unwrap();
+
+      let result = Package {
+        root: root.into(),
+        output: Utf8Path::from_path(tempdir.path())
+          .unwrap()
+          .join("output.package"),
+      }
+      .run();
+
+      if let Err(err) = result {
+        eprintln!("error packaging {root}: {err}");
+
+        for (i, err) in err.iter_chain().skip(1).enumerate() {
+          if i == 0 {
+            eprintln!();
+            eprintln!("because:");
+          }
+
+          eprintln!("- {err}");
+        }
+
+        if let Some(backtrace) = err.backtrace() {
+          if backtrace.status() == BacktraceStatus::Captured {
+            eprintln!("backtrace:");
+            eprintln!("{backtrace}");
+          }
+        }
+
+        panic!("packaging {root} failed");
+      }
+    }
+  }
+}
