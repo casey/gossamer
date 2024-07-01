@@ -26,7 +26,10 @@ impl Package {
 
     let hashes = self.hashes(paths)?;
 
-    self.write(hashes, template)?;
+    let manifest = template.manifest(&hashes);
+
+    crate::package::Package::save(hashes, manifest, &self.output, &self.root)
+      .context(error::PackageSave { path: &self.output })?;
 
     Ok(())
   }
@@ -83,11 +86,6 @@ impl Package {
     );
 
     Ok(paths)
-  }
-
-  fn write(&self, hashes: HashMap<Utf8PathBuf, (Hash, u64)>, template: Template) -> Result {
-    crate::package::Package::save(&self.root, &self.output, hashes, template)
-      .context(error::PackageSave { path: &self.output })
   }
 }
 
