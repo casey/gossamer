@@ -7,6 +7,7 @@ class App {
 
     if (manifest.type != "comic") {
       document.body.innerHTML = `<h1>app cannot handle content type \`${manifest.type}\``;
+      return;
     }
 
     for (let i = 0; i < manifest.pages.length; i++) {
