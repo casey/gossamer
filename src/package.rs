@@ -157,7 +157,7 @@ impl Package {
     output: &Utf8Path,
     root: &Utf8Path,
   ) -> Result<(), Error> {
-    let mut package = BufWriter::new(File::create(&output)?);
+    let mut package = BufWriter::new(File::create(output)?);
 
     package.write_all(crate::package::Package::MAGIC_BYTES.as_bytes())?;
 
