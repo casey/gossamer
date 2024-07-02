@@ -488,9 +488,4 @@ mod tests {
       },
     );
   }
-
-  // todo:
-  // - serve command
-  // - fix backtrace in unwrap and assert_matches in test
-  // - reorganize test stuff
 }

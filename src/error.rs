@@ -6,12 +6,12 @@ pub enum Error {
   #[snafu(display("app package must be of type `app` not `{ty}`"))]
   AppType { backtrace: Backtrace, ty: Type },
   #[snafu(display(
-    "content package of type `{content}` cannot be opened by app that handles `{app}`"
+    "content package of type `{content}` cannot be opened by app that handles `{handles}`"
   ))]
   ContentType {
     backtrace: Backtrace,
     content: Type,
-    app: Type,
+    handles: Type,
   },
   #[snafu(display("failed to get current directory"))]
   CurrentDir {

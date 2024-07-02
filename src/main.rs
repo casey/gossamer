@@ -25,8 +25,9 @@ use {
     num::{ParseIntError, TryFromIntError},
     path::PathBuf,
     process,
-    sync::Arc,
+    sync::{Arc, Mutex},
   },
+  tempfile::TempDir,
   walkdir::WalkDir,
 };
 

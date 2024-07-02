@@ -3,9 +3,9 @@ use super::*;
 #[derive(Parser)]
 pub struct Package {
   #[arg(long, help = "Package contents of directory <ROOT>.")]
-  root: Utf8PathBuf,
+  pub root: Utf8PathBuf,
   #[arg(long, help = "Save package to <OUTPUT>.")]
-  output: Utf8PathBuf,
+  pub output: Utf8PathBuf,
 }
 
 impl Package {
