@@ -308,8 +308,4 @@ mod tests {
       },
     );
   }
-
-  // todo:
-  // - reorganize everything
-  // - test that it actually listens on address
 }
