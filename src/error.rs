@@ -46,11 +46,21 @@ pub enum Error {
     backtrace: Backtrace,
     root: Utf8PathBuf,
   },
+  #[snafu(display("comic package in `{root}` contains no pages"))]
+  NoPages {
+    backtrace: Backtrace,
+    root: Utf8PathBuf,
+  },
   #[snafu(display("package output `{output}` may not be in `{root}`"))]
   OutputInRoot {
     backtrace: Backtrace,
     output: Utf8PathBuf,
     root: Utf8PathBuf,
+  },
+  #[snafu(display("package output `{output}` may not be a directory"))]
+  OutputIsDir {
+    backtrace: Backtrace,
+    output: Utf8PathBuf,
   },
   #[snafu(display("failed to load package `{path}`"))]
   PackageLoad {
@@ -95,4 +105,27 @@ pub enum Error {
     root: Utf8PathBuf,
     source: walkdir::Error,
   },
+}
+
+impl Error {
+  pub fn report(&self) {
+    eprintln!("error: {self}");
+
+    for (i, err) in self.iter_chain().skip(1).enumerate() {
+      if i == 0 {
+        eprintln!();
+        eprintln!("because:");
+      }
+
+      eprintln!("- {err}");
+    }
+
+    if let Some(backtrace) = self.backtrace() {
+      if backtrace.status() == BacktraceStatus::Captured {
+        eprintln!();
+        eprintln!("backtrace:");
+        eprintln!("{backtrace}");
+      }
+    }
+  }
 }

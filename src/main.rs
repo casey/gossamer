@@ -19,7 +19,7 @@ use {
     backtrace::BacktraceStatus,
     collections::{BTreeMap, HashMap, HashSet},
     fmt::{self, Display, Formatter},
-    fs::File,
+    fs::{self, File},
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
     net::SocketAddr,
     num::{ParseIntError, TryFromIntError},
@@ -29,6 +29,20 @@ use {
   },
   walkdir::WalkDir,
 };
+
+#[cfg(test)]
+macro_rules! assert_matches {
+  ($expression:expr, $( $pattern:pat_param )|+ $( if $guard:expr )? $(,)?) => {
+    match $expression {
+      $( $pattern )|+ $( if $guard )? => {}
+      left => panic!(
+        "assertion failed: (left ~= right)\n  left: `{:?}`\n right: `{}`",
+        left,
+        stringify!($($pattern)|+ $(if $guard)?)
+      ),
+    }
+  }
+}
 
 mod error;
 mod into_u64;
@@ -43,29 +57,6 @@ mod ty;
 mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
-
-impl Error {
-  fn report(&self) {
-    eprintln!("error: {self}");
-
-    for (i, err) in self.iter_chain().skip(1).enumerate() {
-      if i == 0 {
-        eprintln!();
-        eprintln!("because:");
-      }
-
-      eprintln!("- {err}");
-    }
-
-    if let Some(backtrace) = self.backtrace() {
-      if backtrace.status() == BacktraceStatus::Captured {
-        eprintln!();
-        eprintln!("backtrace:");
-        eprintln!("{backtrace}");
-      }
-    }
-  }
-}
 
 fn main() {
   if let Err(err) = Subcommand::parse().run() {

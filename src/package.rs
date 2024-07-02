@@ -105,7 +105,7 @@ impl Package {
       hashes.push((hash, len));
     }
 
-    let manifest = hashes
+    let manifest_hash = hashes
       .get(index)
       .context(ManifestIndexOutOfBounds { index })?
       .0;
@@ -149,10 +149,10 @@ impl Package {
       }
     );
 
-    let manifest: Manifest = ciborium::from_reader(Cursor::new(files.get(&manifest).unwrap()))
+    let manifest: Manifest = ciborium::from_reader(Cursor::new(files.get(&manifest_hash).unwrap()))
       .context(DeserializeManifest)?;
 
-    manifest.verify(&files)?;
+    manifest.verify(manifest_hash, &files)?;
 
     Ok(Self { manifest, files })
   }

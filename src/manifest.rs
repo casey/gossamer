@@ -20,7 +20,11 @@ impl Manifest {
     }
   }
 
-  pub fn verify(&self, files: &HashMap<Hash, Vec<u8>>) -> Result<(), package::Error> {
+  pub fn verify(
+    &self,
+    manifest: Hash,
+    files: &HashMap<Hash, Vec<u8>>,
+  ) -> Result<(), package::Error> {
     let mut extra = 0u64;
     let mut missing = 0u64;
 
@@ -38,7 +42,7 @@ impl Manifest {
     ensure!(missing == 0, package::ManifestMissingFiles { missing });
 
     for hash in files.keys() {
-      if !expected.contains(hash) {
+      if *hash != manifest && !expected.contains(hash) {
         extra += 1;
       }
     }
