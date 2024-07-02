@@ -1,7 +1,11 @@
 [package]
 name = "media"
+description = "Media package format and server"
 version = "0.0.0"
+license = "CC0-1.0"
 edition = "2021"
+homepage = "https://github.com/casey/media"
+repository = "https://github.com/casey/media"
 
 [dependencies]
 axum = { version = "0.7.5", features = ["http2"] }
