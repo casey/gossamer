@@ -9,15 +9,6 @@ pub struct Package {
 }
 
 // todo:
-//
-// package command:
-// - comic packaging:
-//   - UnexpectedFile on non-page
-//   - InvalidPage page number too large for u64
-//   - PageMissing
-//   - PageDuplicated
-//   - leading zeros not allowed?
-//
 // - serve command
 // - package save
 // - package load
@@ -322,7 +313,7 @@ mod tests {
     fs::write(root.join("1.jpg"), "bar").unwrap();
 
     Package {
-      root: root.clone(),
+      root,
       output: output.clone(),
     }
     .run()
@@ -360,42 +351,32 @@ mod tests {
   fn directories_are_ignored() {
     let tempdir = tempdir();
 
-    let root_dir = tempdir.path_utf8().join("root");
+    let root = tempdir.path_utf8().join("root");
     let output = tempdir.path_utf8().join("output.package");
 
-    fs::create_dir(&root_dir).unwrap();
+    fs::create_dir(&root).unwrap();
 
-    fs::write(root_dir.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root_dir.join("0.jpg"), "").unwrap();
-    fs::create_dir(&root_dir.join("bar")).unwrap();
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("0.jpg"), "").unwrap();
+    fs::create_dir(&root.join("bar")).unwrap();
 
-    Package {
-      root: root_dir.clone(),
-      output,
-    }
-    .run()
-    .unwrap();
+    Package { root, output }.run().unwrap();
   }
 
   #[test]
   fn ds_store_files_are_ignored() {
     let tempdir = tempdir();
 
-    let root_dir = tempdir.path_utf8().join("root");
+    let root = tempdir.path_utf8().join("root");
     let output = tempdir.path_utf8().join("output.package");
 
-    fs::create_dir(&root_dir).unwrap();
+    fs::create_dir(&root).unwrap();
 
-    fs::write(root_dir.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root_dir.join("0.jpg"), "").unwrap();
-    fs::write(root_dir.join(".DS_Store"), "").unwrap();
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("0.jpg"), "").unwrap();
+    fs::write(root.join(".DS_Store"), "").unwrap();
 
-    Package {
-      root: root_dir.clone(),
-      output,
-    }
-    .run()
-    .unwrap();
+    Package { root, output }.run().unwrap();
   }
 
   #[test]
@@ -421,6 +402,117 @@ mod tests {
         ..
       }
       if root == root_dir,
+    );
+  }
+
+  #[test]
+  fn comic_page_missing_error() {
+    let tempdir = tempdir();
+
+    let root = tempdir.path_utf8().join("root");
+    let output = tempdir.path_utf8().join("output.package");
+
+    fs::create_dir(&root).unwrap();
+
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("1.jpg"), "").unwrap();
+
+    assert_matches!(
+      Package {
+        root,
+        output,
+      }
+      .run()
+      .unwrap_err(),
+      Error::PageMissing {
+        page,
+        ..
+      }
+      if page == 0,
+    );
+  }
+
+  #[test]
+  fn comic_page_duplicated_error() {
+    let tempdir = tempdir();
+
+    let root = tempdir.path_utf8().join("root");
+    let output = tempdir.path_utf8().join("output.package");
+
+    fs::create_dir(&root).unwrap();
+
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("0.jpg"), "").unwrap();
+    fs::write(root.join("00.jpg"), "").unwrap();
+
+    assert_matches!(
+      Package {
+        root,
+        output,
+      }
+      .run()
+      .unwrap_err(),
+      Error::PageDuplicated {
+        page,
+        ..
+      }
+      if page == 0,
+    );
+  }
+
+  #[test]
+  fn comic_unexpected_file() {
+    let tempdir = tempdir();
+
+    let root = tempdir.path_utf8().join("root");
+    let output = tempdir.path_utf8().join("output.package");
+
+    fs::create_dir(&root).unwrap();
+
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("0.jpg"), "").unwrap();
+    fs::write(root.join("foo.jpg"), "").unwrap();
+
+    assert_matches!(
+      Package {
+        root,
+        output,
+      }
+      .run()
+      .unwrap_err(),
+      Error::UnexpectedFile {
+        file,
+        ty,
+        ..
+      }
+      if file == "foo.jpg" && ty == Type::Comic,
+    );
+  }
+
+  #[test]
+  fn comic_invalid_page() {
+    let tempdir = tempdir();
+
+    let root = tempdir.path_utf8().join("root");
+    let output = tempdir.path_utf8().join("output.package");
+
+    fs::create_dir(&root).unwrap();
+
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("18446744073709551616.jpg"), "").unwrap();
+
+    assert_matches!(
+      Package {
+        root,
+        output,
+      }
+      .run()
+      .unwrap_err(),
+      Error::InvalidPage {
+        path,
+        ..
+      }
+      if path == "18446744073709551616.jpg",
     );
   }
 }
