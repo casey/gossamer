@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Debug, PartialEq)]
 pub enum ServerError {
   NotFound { path: String },
 }

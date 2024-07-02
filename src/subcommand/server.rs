@@ -22,6 +22,7 @@ struct State {
   content: Package,
 }
 
+#[derive(Debug)]
 struct Resource {
   content_type: Mime,
   content: Vec<u8>,
@@ -237,14 +238,65 @@ mod tests {
     );
   }
 
+  #[tokio::test]
+  async fn server() {
+    let state = Extension(Arc::new(State {
+      app: Package::load(&app_package()).unwrap(),
+      content: Package::load(&content_package()).unwrap(),
+    }));
+
+    let root = Server::root(state.clone()).await.unwrap();
+    assert_eq!(root.content_type, mime::TEXT_HTML);
+    assert!(root.content.starts_with(b"<html>"));
+
+    let manifest = Server::manifest(state.clone()).await;
+    assert_eq!(manifest.content_type, mime::APPLICATION_JSON);
+    assert!(
+      manifest.content.starts_with(b"{\"type\":\"comic\""),
+      "{}",
+      String::from_utf8(manifest.content).unwrap()
+    );
+
+    let app = Server::app(state.clone(), Path("index.js".into()))
+      .await
+      .unwrap();
+    assert_eq!(app.content_type, mime::TEXT_JAVASCRIPT);
+    assert!(
+      app.content.starts_with(b"const response ="),
+      "{}",
+      String::from_utf8(app.content).unwrap()
+    );
+
+    let content = Server::content(state.clone(), Path("0".into()))
+      .await
+      .unwrap();
+    assert_eq!(content.content_type, mime::IMAGE_JPEG);
+    assert!(
+      content.content.starts_with(b"\xff\xd8\xff\xe0\x00\x10JFIF"),
+      "{}",
+      String::from_utf8_lossy(&content.content),
+    );
+
+    assert_eq!(
+      Server::content(state.clone(), Path("foo".into()))
+        .await
+        .unwrap_err(),
+      ServerError::NotFound {
+        path: "/content/foo".into(),
+      },
+    );
+
+    assert_eq!(
+      Server::app(state.clone(), Path("foo".into()))
+        .await
+        .unwrap_err(),
+      ServerError::NotFound {
+        path: "/app/foo".into(),
+      },
+    );
+  }
+
   // todo:
-  // - check route content types
-  //
-  // - / -> index.html
-  // - /api/manifest
-  // - /app/*path
-  // - /content/*path
-  //
   // - fix backtrace in unwrap and assert_matches in test
   // - reorganize everything
 }
