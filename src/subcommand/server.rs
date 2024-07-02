@@ -239,7 +239,7 @@ mod tests {
   }
 
   #[tokio::test]
-  async fn server() {
+  async fn routes() {
     let state = Extension(Arc::new(State {
       app: Package::load(&app_package()).unwrap(),
       content: Package::load(&content_package()).unwrap(),
