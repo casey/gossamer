@@ -438,7 +438,7 @@ mod tests {
   }
 
   #[test]
-  fn save() {
+  fn save_and_load() {
     let tempdir = tempdir();
 
     let output = tempdir.path_utf8().join("package.package");
@@ -487,18 +487,9 @@ mod tests {
         manifest,
       },
     );
-
-    // #[derive(Debug)]
-    // pub struct Package {
-    //   pub files: HashMap<Hash, Vec<u8>>,
-    //   pub manifest: Manifest,
-    // }
   }
 
   // todo:
-  // - check loaded files
-  // - check loaded manifest
-  //
   // - serve command
   // - fix backtrace in unwrap and assert_matches in test
   // - reorganize test stuff
