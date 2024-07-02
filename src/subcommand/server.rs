@@ -107,25 +107,22 @@ impl Server {
     Ok(())
   }
 
-  async fn manifest(Extension(state): Extension<Arc<State>>) -> Resource {
+  async fn manifest(state: Extension<Arc<State>>) -> Resource {
     Resource::new(
       mime::APPLICATION_JSON,
       serde_json::to_vec(&state.content.manifest).unwrap(),
     )
   }
 
-  async fn root(Extension(state): Extension<Arc<State>>) -> ServerResult {
+  async fn root(state: Extension<Arc<State>>) -> ServerResult {
     Self::file(&state.app, "", "index.html")
   }
 
-  async fn app(Extension(state): Extension<Arc<State>>, Path(path): Path<String>) -> ServerResult {
+  async fn app(state: Extension<Arc<State>>, path: Path<String>) -> ServerResult {
     Self::file(&state.app, "/app/", &path)
   }
 
-  async fn content(
-    Extension(state): Extension<Arc<State>>,
-    Path(path): Path<String>,
-  ) -> ServerResult {
+  async fn content(state: Extension<Arc<State>>, path: Path<String>) -> ServerResult {
     Self::file(&state.content, "/content/", &path)
   }
 
