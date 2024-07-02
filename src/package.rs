@@ -60,15 +60,13 @@ pub enum Error {
     index: u64,
     source: TryFromIntError,
   },
-  #[snafu(display("package does not contain manifest"))]
-  ManifestMissing { backtrace: Backtrace },
   #[snafu(display("package missing {missing} files from manifest"))]
   ManifestMissingFiles { missing: u64, backtrace: Backtrace },
   #[snafu(display("package has trailing {trailing} bytes"))]
   TrailingBytes { backtrace: Backtrace, trailing: u64 },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Package {
   pub files: HashMap<Hash, Vec<u8>>,
   pub manifest: Manifest,
@@ -159,10 +157,8 @@ impl Package {
       }
     );
 
-    let manifest: Manifest = ciborium::from_reader(Cursor::new(
-      files.get(&manifest_hash).context(ManifestMissing)?,
-    ))
-    .context(DeserializeManifest)?;
+    let manifest: Manifest = ciborium::from_reader(Cursor::new(files.get(&manifest_hash).unwrap()))
+      .context(DeserializeManifest)?;
 
     manifest.verify(manifest_hash, &files)?;
 
@@ -171,7 +167,7 @@ impl Package {
 
   pub fn save(
     hashes: HashMap<Utf8PathBuf, (Hash, u64)>,
-    manifest: Manifest,
+    manifest: &Manifest,
     output: &Utf8Path,
     root: &Utf8Path,
   ) -> Result<(), Error> {
@@ -415,16 +411,95 @@ mod tests {
 
     assert_matches!(
       Package::load(&package).unwrap_err(),
-      Error::TrailingBytes { trailing: 1, .. }
+      Error::TrailingBytes { trailing: 1, .. },
     );
   }
 
-  // todo:
-  // - serve command
-  // - package save
-  // - fix backtrace in unwrap and assert_matches in test
+  #[test]
+  fn manifest_deserialize_error() {
+    let tempdir = tempdir();
 
-  // package load:
-  // - manifest cannot be deserialized
-  // - manifest is missing
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&1u64.to_le_bytes());
+    bytes.extend_from_slice(blake3::hash(&[]).as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::DeserializeManifest { .. },
+    );
+  }
+
+  #[test]
+  fn save() {
+    let tempdir = tempdir();
+
+    let output = tempdir.path_utf8().join("package.package");
+
+    let root = tempdir.path_utf8().join("root");
+
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("index.html"), "html").unwrap();
+    fs::write(root.join("index.js"), "js").unwrap();
+
+    let html = blake3::hash(b"html");
+    let js = blake3::hash(b"js");
+
+    let manifest = Manifest::App {
+      handles: Type::Comic,
+      paths: vec![("index.html".into(), html), ("index.js".into(), js)]
+        .into_iter()
+        .collect(),
+    };
+
+    let manifest_bytes = {
+      let mut buffer = Vec::new();
+      ciborium::into_writer(&manifest, &mut buffer).unwrap();
+      buffer
+    };
+
+    let hashes = vec![
+      ("index.html".into(), (html, 4)),
+      ("index.js".into(), (js, 2)),
+    ]
+    .into_iter()
+    .collect();
+
+    Package::save(hashes, &manifest, &output, &root).unwrap();
+
+    assert_eq!(
+      Package::load(&output).unwrap(),
+      Package {
+        files: vec![
+          (html, b"html".into()),
+          (js, b"js".into()),
+          (blake3::hash(&manifest_bytes), manifest_bytes)
+        ]
+        .into_iter()
+        .collect(),
+        manifest,
+      },
+    );
+
+    // #[derive(Debug)]
+    // pub struct Package {
+    //   pub files: HashMap<Hash, Vec<u8>>,
+    //   pub manifest: Manifest,
+    // }
+  }
+
+  // todo:
+  // - check loaded files
+  // - check loaded manifest
+  //
+  // - serve command
+  // - fix backtrace in unwrap and assert_matches in test
+  // - reorganize test stuff
 }

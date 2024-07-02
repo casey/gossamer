@@ -42,7 +42,7 @@ impl Package {
 
     let manifest = template.manifest(&hashes);
 
-    super::Package::save(hashes, manifest, &self.output, &self.root)
+    super::Package::save(hashes, &manifest, &self.output, &self.root)
       .context(error::PackageSave { path: &self.output })?;
 
     Ok(())
