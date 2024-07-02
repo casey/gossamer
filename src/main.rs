@@ -14,9 +14,9 @@ use {
   mime_guess::{mime, Mime},
   regex::Regex,
   serde::{Deserialize, Serialize},
-  snafu::{ensure, Backtrace, ErrorCompat, OptionExt, ResultExt, Snafu},
+  snafu::{ensure, ErrorCompat, OptionExt, ResultExt, Snafu},
   std::{
-    backtrace::BacktraceStatus,
+    backtrace::{Backtrace, BacktraceStatus},
     collections::{BTreeMap, HashMap, HashSet},
     fmt::{self, Display, Formatter},
     fs::{self, File},
@@ -32,32 +32,11 @@ use {
 };
 
 #[cfg(test)]
-macro_rules! assert_matches {
-  ($expression:expr, $( $pattern:pat_param )|+ $( if $guard:expr )? $(,)?) => {
-    match $expression {
-      $( $pattern )|+ $( if $guard )? => {}
-      left => panic!(
-        "assertion failed: (left ~= right)\n  left: `{:?}`\n right: `{}`",
-        left,
-        stringify!($($pattern)|+ $(if $guard)?)
-      ),
-    }
-  }
-}
+#[macro_use]
+mod test;
 
-fn tempdir() -> tempfile::TempDir {
-  tempfile::tempdir().unwrap()
-}
-
-trait TempDirExt {
-  fn path_utf8(&self) -> &Utf8Path;
-}
-
-impl TempDirExt for tempfile::TempDir {
-  fn path_utf8(&self) -> &Utf8Path {
-    self.path().try_into().unwrap()
-  }
-}
+#[cfg(test)]
+use test::*;
 
 mod error;
 mod into_u64;

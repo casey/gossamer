@@ -4,62 +4,65 @@ use super::*;
 #[snafu(context(suffix(false)), visibility(pub))]
 pub enum Error {
   #[snafu(display("app package must be of type `app` not `{ty}`"))]
-  AppType { backtrace: Backtrace, ty: Type },
+  AppType {
+    backtrace: Option<Backtrace>,
+    ty: Type,
+  },
   #[snafu(display(
     "content package of type `{content}` cannot be opened by app that handles `{handles}`"
   ))]
   ContentType {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     content: Type,
     handles: Type,
   },
   #[snafu(display("failed to get current directory"))]
   CurrentDir {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     source: io::Error,
   },
   #[snafu(display("failed to deserialize YAML package metadata at `{path}`"))]
   DeserializeMetadata {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: serde_yaml::Error,
   },
   #[snafu(display("missing `index.html` in `{root}`"))]
   Index {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
   },
   #[snafu(display("invalid page filename `{path}`"))]
   InvalidPage {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: ParseIntError,
   },
   #[snafu(display("I/O error at `{path}`"))]
   Io {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: io::Error,
   },
   #[snafu(display("missing `metadata.yaml` in `{root}`"))]
   MetadataMissing {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
   },
   #[snafu(display("comic package in `{root}` contains no pages"))]
   NoPages {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
   },
   #[snafu(display("package output `{output}` may not be in `{root}`"))]
   OutputInRoot {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     output: Utf8PathBuf,
     root: Utf8PathBuf,
   },
   #[snafu(display("package output `{output}` may not be a directory"))]
   OutputIsDir {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     output: Utf8PathBuf,
   },
   #[snafu(display("failed to load package `{path}`"))]
@@ -75,33 +78,42 @@ pub enum Error {
     source: package::Error,
   },
   #[snafu(display("multifple page {page}s"))]
-  PageDuplicated { backtrace: Backtrace, page: u64 },
+  PageDuplicated {
+    backtrace: Option<Backtrace>,
+    page: u64,
+  },
   #[snafu(display("page {page} missing"))]
-  PageMissing { backtrace: Backtrace, page: u64 },
+  PageMissing {
+    backtrace: Option<Backtrace>,
+    page: u64,
+  },
   #[snafu(
     display("path contains invalid UTF-8: `{}`", path.display())
   )]
-  PathUnicode { backtrace: Backtrace, path: PathBuf },
+  PathUnicode {
+    backtrace: Option<Backtrace>,
+    path: PathBuf,
+  },
   #[snafu(display("I/O error initializing async runtime"))]
   Runtime {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     source: io::Error,
   },
   #[snafu(display("I/O error serving on {address}"))]
   Serve {
     address: SocketAddr,
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     source: io::Error,
   },
   #[snafu(display("unexpected file `{file}` in {ty} package"))]
   UnexpectedFile {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     file: Utf8PathBuf,
     ty: Type,
   },
   #[snafu(display("failed to walk directory `{root}`"))]
   WalkDir {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
     source: walkdir::Error,
   },

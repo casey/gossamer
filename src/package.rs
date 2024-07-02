@@ -5,39 +5,45 @@ use super::*;
 pub enum Error {
   #[snafu(display("failed to deserialize manifest"))]
   DeserializeManifest {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     source: ciborium::de::Error<io::Error>,
   },
   #[snafu(display("package file hash `{hash}` duplicated"))]
-  FileHashDuplicated { hash: Hash, backtrace: Backtrace },
+  FileHashDuplicated {
+    hash: Hash,
+    backtrace: Option<Backtrace>,
+  },
   #[snafu(display("package file hash actually `{actual}` but expected `{expected}`"))]
   FileHashInvalid {
     actual: Hash,
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     expected: Hash,
   },
   #[snafu(display("package file hash `{hash}` out of order"))]
-  FileHashOrder { hash: Hash, backtrace: Backtrace },
+  FileHashOrder {
+    hash: Hash,
+    backtrace: Option<Backtrace>,
+  },
   #[snafu(display("package file length `{len}` cannot be converted to usize"))]
   FileLengthRange {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     len: u64,
     source: TryFromIntError,
   },
   #[snafu(display("I/O error reading file `{path}`"))]
   FileIo {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: io::Error,
   },
   #[snafu(transparent)]
   Io {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     source: io::Error,
   },
   #[snafu(display("I/O error copying from `{path}`"))]
   IoCopy {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: io::Error,
   },
@@ -47,23 +53,35 @@ pub enum Error {
     String::from_utf8_lossy(bytes)
   ))]
   MagicBytes {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     bytes: Vec<u8>,
   },
   #[snafu(display("package contains {extra} extra files not accounted for in manifest"))]
-  ManifestExtraFiles { extra: u64, backtrace: Backtrace },
+  ManifestExtraFiles {
+    extra: u64,
+    backtrace: Option<Backtrace>,
+  },
   #[snafu(display("manifest index {index} out of bounds of hash array"))]
-  ManifestIndexOutOfBounds { backtrace: Backtrace, index: usize },
+  ManifestIndexOutOfBounds {
+    backtrace: Option<Backtrace>,
+    index: usize,
+  },
   #[snafu(display("could not convert manifest index {index} to usize"))]
   ManifestIndexRange {
-    backtrace: Backtrace,
+    backtrace: Option<Backtrace>,
     index: u64,
     source: TryFromIntError,
   },
   #[snafu(display("package missing {missing} files from manifest"))]
-  ManifestMissingFiles { missing: u64, backtrace: Backtrace },
+  ManifestMissingFiles {
+    missing: u64,
+    backtrace: Option<Backtrace>,
+  },
   #[snafu(display("package has trailing {trailing} bytes"))]
-  TrailingBytes { backtrace: Backtrace, trailing: u64 },
+  TrailingBytes {
+    backtrace: Option<Backtrace>,
+    trailing: u64,
+  },
 }
 
 #[derive(Debug, PartialEq)]

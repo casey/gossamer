@@ -297,7 +297,6 @@ mod tests {
   }
 
   // todo:
-  // - fix backtrace in unwrap and assert_matches in test
   // - reorganize everything
   // - test that it actually listens on address
 }
