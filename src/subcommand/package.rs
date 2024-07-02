@@ -339,7 +339,7 @@ mod tests {
 
     fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
     fs::write(root.join("0.jpg"), "").unwrap();
-    fs::create_dir(&root.join("bar")).unwrap();
+    fs::create_dir(root.join("bar")).unwrap();
 
     Package { root, output }.run().unwrap();
   }

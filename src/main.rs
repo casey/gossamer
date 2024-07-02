@@ -19,15 +19,14 @@ use {
     backtrace::{Backtrace, BacktraceStatus},
     collections::{BTreeMap, HashMap, HashSet},
     fmt::{self, Display, Formatter},
-    fs::{self, File},
+    fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
     net::SocketAddr,
     num::{ParseIntError, TryFromIntError},
     path::PathBuf,
     process,
-    sync::{Arc, Mutex},
+    sync::Arc,
   },
-  tempfile::TempDir,
   walkdir::WalkDir,
 };
 

@@ -1,6 +1,11 @@
 use super::*;
 
-pub fn tempdir() -> tempfile::TempDir {
+pub use {
+  std::{fs, sync::Mutex},
+  tempfile::TempDir,
+};
+
+pub fn tempdir() -> TempDir {
   tempfile::tempdir().unwrap()
 }
 
@@ -8,7 +13,7 @@ pub trait TempDirExt {
   fn path_utf8(&self) -> &Utf8Path;
 }
 
-impl TempDirExt for tempfile::TempDir {
+impl TempDirExt for TempDir {
   fn path_utf8(&self) -> &Utf8Path {
     self.path().try_into().unwrap()
   }
