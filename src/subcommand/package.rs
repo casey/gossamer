@@ -9,6 +9,18 @@ pub struct Package {
 }
 
 // todo:
+//
+// package command:
+// - comic packaging:
+//   - UnexpectedFile on non-page
+//   - InvalidPage page number too large for u64
+//   - PageMissing
+//   - PageDuplicated
+//   - leading zeros not allowed?
+//
+// - serve command
+// - package save
+// - package load
 
 impl Package {
   pub fn run(self) -> Result {
@@ -290,6 +302,54 @@ mod tests {
     assert_eq!(paths.len(), 2);
     assert_eq!(paths["index.html"], foo);
     assert_eq!(paths["index.js"], bar);
+
+    assert_eq!(package.files[&foo], "foo".as_bytes());
+    assert_eq!(package.files[&bar], "bar".as_bytes());
+    assert_eq!(package.files[&manifest], manifest_bytes);
+  }
+
+  #[test]
+  fn comic_package_includes_all_pages() {
+    let tempdir = tempdir();
+
+    let root = tempdir.path_utf8().join("root");
+    let output = tempdir.path_utf8().join("output.package");
+
+    fs::create_dir(&root).unwrap();
+
+    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(root.join("0.jpg"), "foo").unwrap();
+    fs::write(root.join("1.jpg"), "bar").unwrap();
+
+    Package {
+      root: root.clone(),
+      output: output.clone(),
+    }
+    .run()
+    .unwrap_or_display();
+
+    let package = super::super::Package::load(&output).unwrap_or_display();
+
+    assert_eq!(package.files.len(), 3);
+
+    let manifest_bytes = {
+      let mut buffer = Vec::new();
+      ciborium::into_writer(&package.manifest, &mut buffer).unwrap();
+      buffer
+    };
+
+    let manifest = blake3::hash(&manifest_bytes);
+
+    let Manifest::Comic { pages } = package.manifest else {
+      panic!("unexpected manifest type");
+    };
+
+    let foo = blake3::hash("foo".as_bytes());
+    let bar = blake3::hash("bar".as_bytes());
+
+    assert_eq!(pages.len(), 2);
+    assert_eq!(pages[0], foo);
+    assert_eq!(pages[1], bar);
 
     assert_eq!(package.files[&foo], "foo".as_bytes());
     assert_eq!(package.files[&bar], "bar".as_bytes());
