@@ -8,11 +8,6 @@ pub struct Package {
   output: Utf8PathBuf,
 }
 
-// todo:
-// - serve command
-// - package save
-// - package load
-
 impl Package {
   pub fn run(self) -> Result {
     ensure!(
@@ -108,20 +103,6 @@ impl Package {
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  fn tempdir() -> tempfile::TempDir {
-    tempfile::tempdir().unwrap()
-  }
-
-  trait TempDirExt {
-    fn path_utf8(&self) -> &Utf8Path;
-  }
-
-  impl TempDirExt for tempfile::TempDir {
-    fn path_utf8(&self) -> &Utf8Path {
-      self.path().try_into().unwrap()
-    }
-  }
 
   #[test]
   fn package() {
@@ -499,7 +480,7 @@ mod tests {
     fs::create_dir(&root).unwrap();
 
     fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("18446744073709551616.jpg"), "").unwrap();
+    fs::write(root.join(format!("{}.jpg", u128::from(u64::MAX) + 1)), "").unwrap();
 
     assert_matches!(
       Package {

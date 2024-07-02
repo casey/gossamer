@@ -44,6 +44,20 @@ macro_rules! assert_matches {
   }
 }
 
+fn tempdir() -> tempfile::TempDir {
+  tempfile::tempdir().unwrap()
+}
+
+trait TempDirExt {
+  fn path_utf8(&self) -> &Utf8Path;
+}
+
+impl TempDirExt for tempfile::TempDir {
+  fn path_utf8(&self) -> &Utf8Path {
+    self.path().try_into().unwrap()
+  }
+}
+
 mod error;
 mod into_u64;
 mod manifest;

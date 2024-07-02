@@ -43,12 +43,12 @@ pub enum Error {
   },
   #[snafu(display(
     "unexpected package magic bytes {} (\"{}\")",
-    hex::encode(magic),
-    String::from_utf8_lossy(magic)
+    hex::encode(bytes),
+    String::from_utf8_lossy(bytes)
   ))]
   MagicBytes {
     backtrace: Backtrace,
-    magic: [u8; 10],
+    bytes: Vec<u8>,
   },
   #[snafu(display("package contains {extra} extra files not accounted for in manifest"))]
   ManifestExtraFiles { extra: u64, backtrace: Backtrace },
@@ -60,6 +60,8 @@ pub enum Error {
     index: u64,
     source: TryFromIntError,
   },
+  #[snafu(display("package does not contain manifest"))]
+  ManifestMissing { backtrace: Backtrace },
   #[snafu(display("package missing {missing} files from manifest"))]
   ManifestMissingFiles { missing: u64, backtrace: Backtrace },
   #[snafu(display("package has trailing {trailing} bytes"))]
@@ -82,11 +84,25 @@ impl Package {
 
     let mut package = BufReader::new(file);
 
-    let mut magic = [0; Self::MAGIC_BYTES.len()];
+    let mut bytes = [0; Self::MAGIC_BYTES.len()];
 
-    package.read_exact(&mut magic)?;
+    let mut read = 0;
+    loop {
+      let n = package.read(&mut bytes[read..])?;
 
-    ensure!(magic == Self::MAGIC_BYTES.as_bytes(), MagicBytes { magic });
+      if n == 0 {
+        break;
+      }
+
+      read += n;
+    }
+
+    ensure!(
+      bytes == Self::MAGIC_BYTES.as_bytes(),
+      MagicBytes {
+        bytes: &bytes[..read],
+      }
+    );
 
     let index = package.read_u64()?;
 
@@ -94,13 +110,23 @@ impl Package {
 
     let hash_count = package.read_u64()?;
 
-    let mut hashes = Vec::new();
+    let mut hashes = Vec::<(Hash, u64)>::new();
 
-    for _ in 0..hash_count {
+    for i in 0..hash_count {
       let hash = package.read_hash()?;
       let len = package.read_u64()?;
 
       usize::try_from(len).context(FileLengthRange { len })?;
+
+      if let Some(last) = i.checked_sub(1) {
+        let last = hashes[last as usize].0;
+        ensure!(hash.as_bytes() >= last.as_bytes(), FileHashOrder { hash });
+
+        ensure!(
+          hash.as_bytes() != last.as_bytes(),
+          FileHashDuplicated { hash }
+        );
+      }
 
       hashes.push((hash, len));
     }
@@ -112,23 +138,7 @@ impl Package {
 
     let mut files = HashMap::<Hash, Vec<u8>>::new();
 
-    let mut last = Option::<Hash>::None;
-
     for (expected, len) in hashes {
-      if let Some(last) = last {
-        ensure!(
-          expected.as_bytes() >= last.as_bytes(),
-          FileHashOrder { hash: expected }
-        );
-
-        ensure!(
-          expected.as_bytes() != last.as_bytes(),
-          FileHashDuplicated { hash: expected }
-        );
-      }
-
-      last = Some(expected);
-
       let mut buffer = vec![0; len as usize];
 
       package.read_exact(&mut buffer)?;
@@ -149,8 +159,10 @@ impl Package {
       }
     );
 
-    let manifest: Manifest = ciborium::from_reader(Cursor::new(files.get(&manifest_hash).unwrap()))
-      .context(DeserializeManifest)?;
+    let manifest: Manifest = ciborium::from_reader(Cursor::new(
+      files.get(&manifest_hash).context(ManifestMissing)?,
+    ))
+    .context(DeserializeManifest)?;
 
     manifest.verify(manifest_hash, &files)?;
 
@@ -232,4 +244,187 @@ impl Package {
       )),
     }
   }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn load_bad_magic_bytes() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    fs::write(&package, "this-is-not-a-package").unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::MagicBytes { bytes, .. }
+      if bytes == *b"this-is-no"
+    );
+  }
+
+  #[test]
+  fn load_truncated_magic_bytes() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    fs::write(&package, "MEDIA").unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::MagicBytes { bytes, .. }
+      if bytes == *b"MEDIA"
+    );
+  }
+
+  #[test]
+  fn manifest_index_out_of_bounds() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::ManifestIndexOutOfBounds { index: 0, .. },
+    );
+  }
+
+  #[test]
+  fn file_hashes_out_of_order() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&2u64.to_le_bytes());
+    bytes.extend_from_slice(&[1; 32]);
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&[0; 32]);
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::FileHashOrder { hash, .. }
+      if hash.as_bytes() == &[0; 32],
+    );
+  }
+
+  #[test]
+  fn file_hash_duplicated() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&2u64.to_le_bytes());
+    bytes.extend_from_slice(&[0; 32]);
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&[0; 32]);
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::FileHashDuplicated { hash, .. }
+      if hash.as_bytes() == &[0; 32],
+    );
+  }
+
+  #[test]
+  fn file_hash_invalid() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&1u64.to_le_bytes());
+    bytes.extend_from_slice(&[0; 32]);
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::FileHashInvalid { actual, expected, .. }
+      if actual == blake3::hash(&[]) && expected.as_bytes() == &[0; 32],
+    );
+  }
+
+  #[test]
+  fn file_truncated() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&1u64.to_le_bytes());
+    bytes.extend_from_slice(&[0; 32]);
+    bytes.extend_from_slice(&1u64.to_le_bytes());
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::Io { source, .. }
+      if source.kind() == io::ErrorKind::UnexpectedEof,
+    );
+  }
+
+  #[test]
+  fn trailing_bytes() {
+    let tempdir = tempdir();
+
+    let package = tempdir.path_utf8().join("package.package");
+
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&1u64.to_le_bytes());
+    bytes.extend_from_slice(blake3::hash(&[]).as_bytes());
+    bytes.extend_from_slice(&0u64.to_le_bytes());
+    bytes.extend_from_slice(&[0]);
+
+    fs::write(&package, bytes).unwrap();
+
+    assert_matches!(
+      Package::load(&package).unwrap_err(),
+      Error::TrailingBytes { trailing: 1, .. }
+    );
+  }
+
+  // todo:
+  // - serve command
+  // - package save
+  // - fix backtrace in unwrap and assert_matches in test
+
+  // package load:
+  // - manifest cannot be deserialized
+  // - manifest is missing
 }
