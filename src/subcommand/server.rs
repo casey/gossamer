@@ -8,10 +8,7 @@ use {
     Router,
   },
   tokio::runtime::Runtime,
-  tower_http::{
-    propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer,
-    validate_request::ValidateRequestHeaderLayer,
-  },
+  tower_http::{propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer},
 };
 
 #[derive(Parser)]
@@ -118,9 +115,6 @@ impl Server {
               move |request: &http::Request<Body>| {
                 Some(Self::content_security_policy(self.address, request))
               },
-            ))
-            .layer(ValidateRequestHeaderLayer::custom(
-              |request: &mut http::Request<Body>| todo!(),
             ))
             .layer(Extension(Arc::new(library)))
             .into_make_service(),
