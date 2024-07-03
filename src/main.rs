@@ -6,13 +6,20 @@ use {
     manifest::Manifest, metadata::Metadata, package::Package, path_ext::PathExt, read_ext::ReadExt,
     subcommand::Subcommand, target::Target, template::Template, ty::Type, write_ext::WriteExt,
   },
-  axum::http::header,
+  axum::{
+    body::Body,
+    http::{
+      self,
+      header::{self, HeaderValue},
+    },
+  },
   blake3::{Hash, Hasher},
   camino::{Utf8Path, Utf8PathBuf},
   clap::{ArgGroup, Parser},
   libc::EXIT_FAILURE,
   mime_guess::{mime, Mime},
   regex::Regex,
+  regex_static::{lazy_regex, once_cell::sync::Lazy},
   serde::{Deserialize, Deserializer, Serialize},
   snafu::{ensure, ErrorCompat, OptionExt, ResultExt, Snafu},
   std::{

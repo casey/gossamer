@@ -1,4 +1,15 @@
-use super::*;
+use {
+  super::*,
+  axum::{
+    extract::{Extension, Path},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+  },
+  tokio::runtime::Runtime,
+  tower_http::{propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer},
+};
 
 #[derive(Parser)]
 #[clap(group(
@@ -48,7 +59,7 @@ impl Resource {
 }
 
 impl IntoResponse for Resource {
-  fn into_response(self) -> axum::http::Response<axum::body::Body> {
+  fn into_response(self) -> Response<Body> {
     (
       [(header::CONTENT_TYPE, self.content_type.to_string())],
       self.content,
@@ -122,6 +133,13 @@ impl Server {
             .route("/:app/:content/api/manifest", get(Self::manifest))
             .route("/:app/:content/app/*path", get(Self::app))
             .route("/:app/:content/content/*path", get(Self::content))
+            .layer(PropagateHeaderLayer::new(header::CONTENT_SECURITY_POLICY))
+            .layer(SetRequestHeaderLayer::overriding(
+              header::CONTENT_SECURITY_POLICY,
+              move |request: &http::Request<Body>| {
+                Some(Self::content_security_policy(self.address, request))
+              },
+            ))
             .layer(Extension(Arc::new(library)))
             .into_make_service(),
         )
@@ -132,6 +150,20 @@ impl Server {
     })?;
 
     Ok(())
+  }
+
+  fn content_security_policy(address: SocketAddr, request: &http::Request<Body>) -> HeaderValue {
+    static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
+
+    RE.captures(request.uri().path())
+      .map(|captures| {
+        HeaderValue::try_from(format!(
+          "default-src http://{address}/{}/{}/",
+          &captures[1], &captures[2],
+        ))
+        .unwrap()
+      })
+      .unwrap_or_else(|| HeaderValue::from_static("default-src"))
   }
 
   fn package(library: &Library, hash: Hash) -> ServerResult<&Package> {
