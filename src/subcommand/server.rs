@@ -70,13 +70,15 @@ impl Server {
     })?;
 
     match app.manifest {
-      Manifest::App { handles, .. } => {
+      Manifest::App { target, .. } => {
+        let content = content.manifest.ty();
         ensure!(
-          content.manifest.ty() == handles,
-          error::ContentType {
-            content: content.manifest.ty(),
-            handles,
-          }
+          match target {
+            Target::App => content == Type::App,
+            Target::Library => todo!(),
+            Target::Comic => content == Type::Comic,
+          },
+          error::Target { content, target }
         );
       }
       _ => {
@@ -240,9 +242,9 @@ mod tests {
       }
       .run()
       .unwrap_err(),
-      Error::ContentType {
+      Error::Target {
         content: Type::App,
-        handles: Type::Comic,
+        target: Target::Comic,
         ..
       }
     );

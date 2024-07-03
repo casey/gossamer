@@ -9,12 +9,12 @@ pub enum Error {
     ty: Type,
   },
   #[snafu(display(
-    "content package of type `{content}` cannot be opened by app that handles `{handles}`"
+    "content package of type `{content}` cannot be opened by app with target `{target}`"
   ))]
-  ContentType {
+  Target {
     backtrace: Option<Backtrace>,
     content: Type,
-    handles: Type,
+    target: crate::Target,
   },
   #[snafu(display("failed to get current directory"))]
   CurrentDir {

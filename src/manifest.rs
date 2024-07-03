@@ -4,7 +4,7 @@ use super::*;
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Manifest {
   App {
-    handles: Type,
+    target: Target,
     paths: BTreeMap<String, Hash>,
   },
   Comic {

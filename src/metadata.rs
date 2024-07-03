@@ -3,9 +3,15 @@ use super::*;
 #[derive(Copy, Clone, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Metadata {
-  App { handles: Type },
+  App { target: Target },
   Comic,
 }
+
+// app type
+// doc type
+// handles Handle
+// role
+// target
 
 impl Metadata {
   pub const PATH: &'static str = "metadata.yaml";
@@ -17,12 +23,12 @@ impl Metadata {
 
   pub fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
     match self {
-      Self::App { handles } => {
+      Self::App { target } => {
         ensure!(
           paths.contains(Utf8Path::new("index.html")),
           error::Index { root }
         );
-        Ok(Template::App { handles })
+        Ok(Template::App { target })
       }
       Self::Comic => {
         let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();

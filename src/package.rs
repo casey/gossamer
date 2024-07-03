@@ -471,7 +471,7 @@ mod tests {
     let js = blake3::hash(b"js");
 
     let manifest = Manifest::App {
-      handles: Type::Comic,
+      target: Target::Comic,
       paths: vec![("index.html".into(), html), ("index.js".into(), js)]
         .into_iter()
         .collect(),

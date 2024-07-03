@@ -198,7 +198,7 @@ mod tests {
 
     fs::create_dir(&root_dir).unwrap();
 
-    fs::write(root_dir.join("metadata.yaml"), "type: app\nhandles: comic").unwrap();
+    fs::write(root_dir.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
 
     assert_matches!(
       Package {
@@ -239,7 +239,7 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: app\nhandles: comic").unwrap();
+    fs::write(root.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
     fs::write(root.join("index.html"), "foo").unwrap();
     fs::write(root.join("index.js"), "bar").unwrap();
 
@@ -262,11 +262,11 @@ mod tests {
 
     let manifest = blake3::hash(&manifest_bytes);
 
-    let Manifest::App { handles, paths } = package.manifest else {
+    let Manifest::App { target, paths } = package.manifest else {
       panic!("unexpected manifest type");
     };
 
-    assert_eq!(handles, Type::Comic);
+    assert_eq!(target, Target::Comic);
 
     let foo = blake3::hash("foo".as_bytes());
     let bar = blake3::hash("bar".as_bytes());

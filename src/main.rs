@@ -3,8 +3,8 @@
 use {
   self::{
     error::Error, into_u64::IntoU64, manifest::Manifest, metadata::Metadata, package::Package,
-    path_ext::PathExt, read_ext::ReadExt, subcommand::Subcommand, template::Template, ty::Type,
-    write_ext::WriteExt,
+    path_ext::PathExt, read_ext::ReadExt, subcommand::Subcommand, target::Target,
+    template::Template, ty::Type, write_ext::WriteExt,
   },
   axum::http::header,
   blake3::{Hash, Hasher},
@@ -45,6 +45,7 @@ mod package;
 mod path_ext;
 mod read_ext;
 mod subcommand;
+mod target;
 mod template;
 mod ty;
 mod write_ext;
