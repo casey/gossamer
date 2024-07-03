@@ -1117,6 +1117,7 @@ dependencies = [
  "http",
  "http-body",
  "http-body-util",
+ "mime",
  "pin-project-lite",
  "tower-layer",
  "tower-service",

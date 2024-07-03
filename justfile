@@ -23,6 +23,7 @@ serve:
   mkdir tmp
   cargo build
   ./target/debug/media package --root apps/comic --output tmp/app.package
+  ./target/debug/media package --root apps/library --output tmp/library.package
   ./target/debug/media package --root content/comic --output tmp/content.package
   ./target/debug/media server \
     --open \

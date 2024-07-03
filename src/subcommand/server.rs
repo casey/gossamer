@@ -8,35 +8,19 @@ use {
     Router,
   },
   tokio::runtime::Runtime,
-  tower_http::{propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer},
+  tower_http::{
+    propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer,
+    validate_request::ValidateRequestHeaderLayer,
+  },
 };
 
 #[derive(Parser)]
-#[clap(group(
-  ArgGroup::new("mode")
-    .required(true)
-    .args(&["app", "library"]))
-)]
 pub struct Server {
   #[arg(long, help = "Listen on <ADDRESS> for incoming requests.")]
   address: SocketAddr,
-  #[arg(
-    long,
-    help = "Serve contents with app <PACKAGE>.",
-    value_name = "PACKAGE",
-    requires = "content"
-  )]
-  app: Option<Utf8PathBuf>,
-  #[arg(long, help = "Serve contents of <PACKAGE>.", value_name = "PACKAGE")]
-  content: Option<Utf8PathBuf>,
-  #[arg(
-    long,
-    help = "Serve contents of library in <DIRECTORY>.",
-    value_name = "DIRECTORY",
-    conflicts_with = "content"
-  )]
-  library: Option<Utf8PathBuf>,
-  #[arg(long, help = "Load server in browser.")]
+  #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>")]
+  packages: Vec<Utf8PathBuf>,
+  #[arg(long, help = "Open server in browser.")]
   open: bool,
 }
 
@@ -85,45 +69,39 @@ type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 impl Server {
   pub fn run(self) -> Result {
-    fn load(path: &Utf8Path) -> Result<Package> {
-      Package::load(path).context(error::PackageLoad { path })
-    }
-
-    let app = self.app.as_ref().map(|path| load(path)).transpose()?;
-    let content = self.content.as_ref().map(|path| load(path)).transpose()?;
-
-    if let (Some(app), Some(content)) = (&app, &content) {
-      match app.manifest {
-        Manifest::App { target, .. } => {
-          let content = content.manifest.ty();
-          ensure!(
-            match target {
-              Target::App => content == Type::App,
-              Target::Library => todo!(),
-              Target::Comic => content == Type::Comic,
-            },
-            error::Target { content, target }
-          );
-        }
-        _ => {
-          return error::AppType {
-            ty: app.manifest.ty(),
-          }
-          .fail()
-        }
-      };
-
-      let url = format!("http://{}/{}/{}/", self.address, app.hash, content.hash);
-
-      if self.open {
-        open::that(&url).context(error::Open { url: &url })?;
-      }
-    }
-
     let mut library = Library::default();
 
-    app.map(|package| library.add(package));
-    content.map(|package| library.add(package));
+    for path in &self.packages {
+      let package = Package::load(path).context(error::PackageLoad { path })?;
+      library.add(package);
+    }
+
+    if self.open {
+      let url = format!("http://{}/", self.address);
+      open::that(&url).context(error::Open { url: &url })?;
+    }
+
+    // if let (Some(app), Some(content)) = (&app, &content) {
+    //   match app.manifest {
+    //     Manifest::App { target, .. } => {
+    //       let content = content.manifest.ty();
+    //       ensure!(
+    //         match target {
+    //           Target::App => content == Type::App,
+    //           Target::Library => todo!(),
+    //           Target::Comic => content == Type::Comic,
+    //         },
+    //         error::Target { content, target }
+    //       );
+    //     }
+    //     _ => {
+    //       return error::AppType {
+    //         ty: app.manifest.ty(),
+    //       }
+    //       .fail()
+    //     }
+    //   };
+    // }
 
     Runtime::new().context(error::Runtime)?.block_on(async {
       axum_server::Server::bind(self.address)
@@ -141,6 +119,9 @@ impl Server {
                 Some(Self::content_security_policy(self.address, request))
               },
             ))
+            .layer(ValidateRequestHeaderLayer::custom(
+              |request: &mut http::Request<Body>| todo!(),
+            ))
             .layer(Extension(Arc::new(library)))
             .into_make_service(),
         )
@@ -156,7 +137,13 @@ impl Server {
   fn content_security_policy(address: SocketAddr, request: &http::Request<Body>) -> HeaderValue {
     static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
 
-    RE.captures(request.uri().path())
+    let path = request.uri().path();
+
+    if path == "/" {
+      return HeaderValue::from_static("default-src 'self'");
+    }
+
+    RE.captures(path)
       .map(|captures| {
         HeaderValue::try_from(format!(
           "default-src http://{address}/{}/{}/",
@@ -281,9 +268,7 @@ mod tests {
     assert_matches!(
       Server {
         address: "0.0.0.0:80".parse().unwrap(),
-        app: Some(app.clone()),
-        content: Some(content),
-        library: None,
+        packages: vec![app.clone(), content],
         open: false,
       }
       .run()
@@ -302,52 +287,13 @@ mod tests {
     assert_matches!(
       Server {
         address: "0.0.0.0:80".parse().unwrap(),
-        app: Some(app_package()),
-        content: Some(content.clone()),
-        library: None,
+        packages: vec![app_package(), content.clone()],
         open: false,
       }
       .run()
       .unwrap_err(),
       Error::PackageLoad { path, .. }
       if path == content,
-    );
-  }
-
-  #[test]
-  fn app_package_is_not_app() {
-    assert_matches!(
-      Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        app: Some(content_package()),
-        content: Some(content_package()),
-        library: None,
-        open: false,
-      }
-      .run()
-      .unwrap_err(),
-      Error::AppType { ty, .. }
-      if ty == Type::Comic,
-    );
-  }
-
-  #[test]
-  fn app_doesnt_handle_content_type() {
-    assert_matches!(
-      Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        app: Some(app_package()),
-        content: Some(app_package()),
-        library: None,
-        open: false,
-      }
-      .run()
-      .unwrap_err(),
-      Error::Target {
-        content: Type::App,
-        target: Target::Comic,
-        ..
-      }
     );
   }
 
