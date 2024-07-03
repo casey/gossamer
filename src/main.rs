@@ -31,7 +31,7 @@ use {
     net::SocketAddr,
     num::{ParseIntError, TryFromIntError},
     path::PathBuf,
-    process,
+    process, str,
     str::FromStr,
     sync::Arc,
   },

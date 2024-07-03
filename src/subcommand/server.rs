@@ -129,6 +129,7 @@ impl Server {
       axum_server::Server::bind(self.address)
         .serve(
           Router::new()
+            .route("/", get(Self::library))
             .route("/:app/:content/", get(Self::root))
             .route("/:app/:content/api/manifest", get(Self::manifest))
             .route("/:app/:content/app/*path", get(Self::app))
@@ -170,6 +171,18 @@ impl Server {
     library.package(hash).ok_or_else(|| ServerError::NotFound {
       message: format!("package {hash} not found"),
     })
+  }
+
+  async fn library(library: Extension<Arc<Library>>) -> ServerResult {
+    Self::file(
+      library
+        .handler(Target::Library)
+        .ok_or_else(|| ServerError::NotFound {
+          message: format!("library handler not found"),
+        })?,
+      "",
+      "index.html",
+    )
   }
 
   async fn root(library: Extension<Arc<Library>>, hash_root: HashRoot) -> ServerResult {
@@ -226,6 +239,13 @@ mod tests {
       subcommand::package::Package {
         root: "apps/comic".into(),
         output: tempdir.path_utf8().join("app.package"),
+      }
+      .run()
+      .unwrap();
+
+      subcommand::package::Package {
+        root: "apps/library".into(),
+        output: tempdir.path_utf8().join("library.package"),
       }
       .run()
       .unwrap();
@@ -339,6 +359,7 @@ mod tests {
 
     let app_package = Package::load(&packages().join("app.package")).unwrap();
     let content_package = Package::load(&packages().join("content.package")).unwrap();
+    let library_package = Package::load(&packages().join("library.package")).unwrap();
 
     let app = app_package.hash;
     let content = content_package.hash;
@@ -347,8 +368,17 @@ mod tests {
 
     library.add(app_package);
     library.add(content_package);
+    library.add(library_package);
 
     let library = Extension(Arc::new(library));
+
+    {
+      let library = Server::library(library.clone()).await.unwrap();
+      assert_eq!(library.content_type, mime::TEXT_HTML);
+      assert!(str::from_utf8(&library.content)
+        .unwrap()
+        .contains("Library!"));
+    }
 
     let root = Server::root(
       library.clone(),
