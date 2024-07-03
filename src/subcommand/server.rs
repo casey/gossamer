@@ -73,6 +73,7 @@ impl Server {
       library.add(package);
     }
 
+    // todo: run after starting server
     if self.open {
       let url = format!("http://{}/", self.address);
       open::that(&url).context(error::Open { url: &url })?;
