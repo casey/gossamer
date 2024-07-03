@@ -2,8 +2,8 @@
 
 use {
   self::{
-    deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, manifest::Manifest,
-    metadata::Metadata, package::Package, path_ext::PathExt, read_ext::ReadExt,
+    deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, library::Library,
+    manifest::Manifest, metadata::Metadata, package::Package, path_ext::PathExt, read_ext::ReadExt,
     subcommand::Subcommand, target::Target, template::Template, ty::Type, write_ext::WriteExt,
   },
   axum::http::header,
@@ -41,6 +41,7 @@ use test::*;
 mod deserialize_from_str;
 mod error;
 mod into_u64;
+mod library;
 mod manifest;
 mod metadata;
 mod package;

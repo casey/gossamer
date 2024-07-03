@@ -29,26 +29,6 @@ pub struct Server {
   open: bool,
 }
 
-#[derive(Default)]
-struct Library {
-  packages: HashMap<Hash, Package>,
-}
-
-impl Library {
-  fn add(&mut self, package: Package) {
-    self.packages.insert(package.hash, package);
-  }
-
-  fn package(&self, hash: Hash) -> ServerResult<&Package> {
-    self
-      .packages
-      .get(&hash)
-      .ok_or_else(|| ServerError::NotFound {
-        message: format!("package {hash} not found"),
-      })
-  }
-}
-
 type HashPath = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>, String)>;
 type HashRoot = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>)>;
 
@@ -154,14 +134,24 @@ impl Server {
     Ok(())
   }
 
+  fn package(library: &Library, hash: Hash) -> ServerResult<&Package> {
+    library.package(hash).ok_or_else(|| ServerError::NotFound {
+      message: format!("package {hash} not found"),
+    })
+  }
+
   async fn root(library: Extension<Arc<Library>>, hash_root: HashRoot) -> ServerResult {
-    Self::file(library.package(hash_root.0 .0 .0)?, "", "index.html")
+    Self::file(
+      Self::package(&library, hash_root.0 .0 .0)?,
+      "",
+      "index.html",
+    )
   }
 
   async fn manifest(library: Extension<Arc<Library>>, hash_root: HashRoot) -> ServerResult {
     Ok(Resource::new(
       mime::APPLICATION_JSON,
-      serde_json::to_vec(&library.package(hash_root.0 .1 .0)?.manifest).unwrap(),
+      serde_json::to_vec(&Self::package(&library, hash_root.0 .1 .0)?.manifest).unwrap(),
     ))
   }
 
@@ -169,14 +159,14 @@ impl Server {
     library: Extension<Arc<Library>>,
     Path((app, _content, path)): HashPath,
   ) -> ServerResult {
-    Self::file(library.package(app.0)?, "/app/", &path)
+    Self::file(Self::package(&library, app.0)?, "/app/", &path)
   }
 
   async fn content(
     library: Extension<Arc<Library>>,
     Path((_app, content, path)): HashPath,
   ) -> ServerResult {
-    Self::file(library.package(content.0)?, "/content/", &path)
+    Self::file(Self::package(&library, content.0)?, "/content/", &path)
   }
 
   fn file(package: &Package, prefix: &str, path: &str) -> ServerResult {
