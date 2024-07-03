@@ -219,10 +219,6 @@ mod tests {
     packages().join("app.package")
   }
 
-  fn hash_path(app: Hash, content: Hash, path: String) -> HashPath {
-    Path((DeserializeFromStr(app), DeserializeFromStr(content), path))
-  }
-
   #[test]
   fn app_load_error() {
     let tempdir = tempdir();
@@ -305,6 +301,10 @@ mod tests {
 
   #[tokio::test]
   async fn routes() {
+    fn hash_path(app: Hash, content: Hash, path: String) -> HashPath {
+      Path((DeserializeFromStr(app), DeserializeFromStr(content), path))
+    }
+
     let app_package = Package::load(&packages().join("app.package")).unwrap();
     let content_package = Package::load(&packages().join("content.package")).unwrap();
 
