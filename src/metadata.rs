@@ -7,12 +7,6 @@ pub enum Metadata {
   Comic,
 }
 
-// app type
-// doc type
-// handles Handle
-// role
-// target
-
 impl Metadata {
   pub const PATH: &'static str = "metadata.yaml";
 

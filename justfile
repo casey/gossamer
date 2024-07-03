@@ -24,4 +24,8 @@ serve:
   cargo build
   ./target/debug/media package --root apps/comic --output tmp/app.package
   ./target/debug/media package --root content/comic --output tmp/content.package
-  ./target/debug/media server --address 127.0.0.1:8000 --app tmp/app.package --content tmp/content.package
+  ./target/debug/media server \
+    --open \
+    --address 127.0.0.1:8000 \
+    --app tmp/app.package \
+    --content tmp/content.package

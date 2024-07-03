@@ -54,6 +54,12 @@ pub enum Error {
     backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
   },
+  #[snafu(display("failed to open `{url}`"))]
+  Open {
+    backtrace: Option<Backtrace>,
+    source: io::Error,
+    url: String,
+  },
   #[snafu(display("package output `{output}` may not be in `{root}`"))]
   OutputInRoot {
     backtrace: Option<Backtrace>,
