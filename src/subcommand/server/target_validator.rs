@@ -15,7 +15,7 @@ impl ValidateRequest<Body> for TargetValidator {
     static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/.*$");
 
     fn packages<'a>(library: &'a Library, path: &str) -> Option<(&'a Package, &'a Package)> {
-      let captures = dbg!(RE.captures(dbg!(path)))?;
+      let captures = RE.captures(path)?;
 
       let app = library.package(captures[1].parse().unwrap())?;
       let content = library.package(captures[2].parse().unwrap())?;
