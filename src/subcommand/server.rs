@@ -198,46 +198,22 @@ impl Server {
 mod tests {
   use super::*;
 
-  fn app_package() -> Utf8PathBuf {
-    packages().join("app.package")
-  }
-
   #[test]
-  fn app_load_error() {
+  fn package_load_error() {
     let tempdir = tempdir();
 
-    let app = tempdir.path_utf8().join("app.package");
-    let content = tempdir.path_utf8().join("content.package");
+    let package = tempdir.path_utf8().join("app.package");
 
     assert_matches!(
       Server {
         address: "0.0.0.0:80".parse().unwrap(),
-        packages: vec![app.clone(), content],
+        packages: vec![package.clone()],
         open: false,
       }
       .run()
       .unwrap_err(),
       Error::PackageLoad { path, .. }
-      if path == app,
-    );
-  }
-
-  #[test]
-  fn content_load_error() {
-    let tempdir = tempdir();
-
-    let content = tempdir.path_utf8().join("content.package");
-
-    assert_matches!(
-      Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        packages: vec![app_package(), content.clone()],
-        open: false,
-      }
-      .run()
-      .unwrap_err(),
-      Error::PackageLoad { path, .. }
-      if path == content,
+      if path == package,
     );
   }
 
@@ -247,20 +223,16 @@ mod tests {
       Path((DeserializeFromStr(app), DeserializeFromStr(content), path))
     }
 
-    let app_package = Package::load(&packages().join("app.package")).unwrap();
-    let content_package = Package::load(&packages().join("content.package")).unwrap();
-    let library_package = Package::load(&packages().join("library.package")).unwrap();
-
-    let app = app_package.hash;
-    let content = content_package.hash;
-
     let mut library = Library::default();
 
-    library.add(app_package);
-    library.add(content_package);
-    library.add(library_package);
+    library.add(PACKAGES.app().clone());
+    library.add(PACKAGES.comic().clone());
+    library.add(PACKAGES.library().clone());
 
     let library = Extension(Arc::new(library));
+
+    let app = PACKAGES.app().hash;
+    let comic = PACKAGES.comic().hash;
 
     {
       let library = Server::library(library.clone()).await.unwrap();
@@ -272,7 +244,7 @@ mod tests {
 
     let root = Server::root(
       library.clone(),
-      Path((DeserializeFromStr(app), DeserializeFromStr(content))),
+      Path((DeserializeFromStr(app), DeserializeFromStr(comic))),
     )
     .await
     .unwrap();
@@ -281,7 +253,7 @@ mod tests {
 
     let manifest = Server::manifest(
       library.clone(),
-      Path((DeserializeFromStr(app), DeserializeFromStr(content))),
+      Path((DeserializeFromStr(app), DeserializeFromStr(comic))),
     )
     .await
     .unwrap();
@@ -292,7 +264,7 @@ mod tests {
       String::from_utf8(manifest.content).unwrap()
     );
 
-    let index_js = Server::app(library.clone(), hash_path(app, content, "index.js".into()))
+    let index_js = Server::app(library.clone(), hash_path(app, comic, "index.js".into()))
       .await
       .unwrap();
     assert_eq!(index_js.content_type, mime::TEXT_JAVASCRIPT);
@@ -302,7 +274,7 @@ mod tests {
       String::from_utf8(index_js.content).unwrap()
     );
 
-    let page0 = Server::content(library.clone(), hash_path(app, content, "0".into()))
+    let page0 = Server::content(library.clone(), hash_path(app, comic, "0".into()))
       .await
       .unwrap();
     assert_eq!(page0.content_type, mime::IMAGE_JPEG);
@@ -313,7 +285,7 @@ mod tests {
     );
 
     assert_eq!(
-      Server::content(library.clone(), hash_path(app, content, "foo".into()))
+      Server::content(library.clone(), hash_path(app, comic, "foo".into()))
         .await
         .unwrap_err(),
       ServerError::NotFound {
@@ -322,7 +294,7 @@ mod tests {
     );
 
     assert_eq!(
-      Server::app(library.clone(), hash_path(app, content, "foo".into()))
+      Server::app(library.clone(), hash_path(app, comic, "foo".into()))
         .await
         .unwrap_err(),
       ServerError::NotFound {
@@ -333,24 +305,23 @@ mod tests {
 
   #[test]
   fn content_security_policy() {
+    let address = "0.0.0.0:80".parse().unwrap();
+
     assert_eq!(
-      Server::content_security_policy("0.0.0.0:80".parse().unwrap(), &Uri::from_static("/")),
+      Server::content_security_policy(address, &Uri::from_static("/")),
       "default-src 'self'"
     );
 
-    let app = blake3::hash(b"app");
-    let content = blake3::hash(b"content");
+    let app = PACKAGES.app().hash;
+    let content = PACKAGES.comic().hash;
 
     assert_eq!(
-      Server::content_security_policy(
-        "0.0.0.0:80".parse().unwrap(),
-        &format!("/{app}/{content}/").parse().unwrap()
-      ),
-      format!("default-src http://0.0.0.0:80/{app}/{content}/"),
+      Server::content_security_policy(address, &format!("/{app}/{content}/").parse().unwrap()),
+      format!("default-src http://{address}/{app}/{content}/"),
     );
 
     assert_eq!(
-      Server::content_security_policy("0.0.0.0:80".parse().unwrap(), &"/foo".parse().unwrap()),
+      Server::content_security_policy(address, &"/foo".parse().unwrap()),
       "default-src",
     );
   }

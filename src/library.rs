@@ -35,11 +35,11 @@ mod tests {
   fn add() {
     let mut library = Library::default();
 
-    let package = Package::load(&packages().join("app.package")).unwrap();
+    let package = PACKAGES.app();
 
     library.add(package.clone());
 
-    assert_eq!(library.package(package.hash), Some(&package));
-    assert_eq!(library.handler(Target::Comic), Some(&package));
+    assert_eq!(library.package(package.hash), Some(package));
+    assert_eq!(library.handler(Target::Comic), Some(package));
   }
 }

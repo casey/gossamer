@@ -1,9 +1,6 @@
 use super::*;
 
-pub use {
-  std::{fs, sync::Mutex},
-  tempfile::TempDir,
-};
+pub use {std::fs, tempfile::TempDir};
 
 pub fn tempdir() -> TempDir {
   tempfile::tempdir().unwrap()
@@ -32,37 +29,64 @@ macro_rules! assert_matches {
   }
 }
 
-static PACKAGES: Mutex<Option<TempDir>> = Mutex::new(None);
+pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
+  let dir = tempdir();
 
-pub fn packages() -> Utf8PathBuf {
-  let mut packages = PACKAGES.lock().unwrap();
+  let path = dir.path_utf8();
 
-  if packages.is_none() {
-    let tempdir = tempdir();
+  let app = path.join("app.package");
 
-    subcommand::package::Package {
-      root: "apps/comic".into(),
-      output: tempdir.path_utf8().join("app.package"),
-    }
-    .run()
-    .unwrap();
+  let library = path.join("library.package");
 
-    subcommand::package::Package {
-      root: "apps/library".into(),
-      output: tempdir.path_utf8().join("library.package"),
-    }
-    .run()
-    .unwrap();
+  let comic = path.join("comic.package");
 
-    subcommand::package::Package {
-      root: "content/comic".into(),
-      output: tempdir.path_utf8().join("content.package"),
-    }
-    .run()
-    .unwrap();
+  subcommand::package::Package {
+    root: "apps/comic".into(),
+    output: app.clone(),
+  }
+  .run()
+  .unwrap();
 
-    *packages = Some(tempdir);
+  subcommand::package::Package {
+    root: "apps/library".into(),
+    output: library.clone(),
+  }
+  .run()
+  .unwrap();
+
+  subcommand::package::Package {
+    root: "content/comic".into(),
+    output: comic.clone(),
+  }
+  .run()
+  .unwrap();
+
+  Packages {
+    dir,
+    app: Package::load(&app).unwrap(),
+    library: Package::load(&library).unwrap(),
+    comic: Package::load(&comic).unwrap(),
+  }
+});
+
+pub struct Packages {
+  library: Package,
+  app: Package,
+  comic: Package,
+  #[allow(unused)]
+  dir: TempDir,
+}
+
+impl Packages {
+  pub fn app(&self) -> &Package {
+    &self.app
   }
 
-  packages.as_ref().unwrap().path_utf8().into()
+  pub fn library(&self) -> &Package {
+    &self.library
+  }
+
+  pub fn comic(&self) -> &Package {
+    &self.comic
+  }
 }
