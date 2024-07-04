@@ -100,7 +100,7 @@ impl Server {
             .layer(SetRequestHeaderLayer::overriding(
               header::CONTENT_SECURITY_POLICY,
               move |request: &http::Request<Body>| {
-                Some(Self::content_security_policy(self.address, request))
+                Some(Self::content_security_policy(self.address, request.uri()))
               },
             ))
             .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
@@ -118,10 +118,10 @@ impl Server {
     Ok(())
   }
 
-  fn content_security_policy(address: SocketAddr, request: &http::Request<Body>) -> HeaderValue {
+  fn content_security_policy(address: SocketAddr, uri: &Uri) -> HeaderValue {
     static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
 
-    let path = request.uri().path();
+    let path = uri.path();
 
     if path == "/" {
       return HeaderValue::from_static("default-src 'self'");
@@ -328,6 +328,30 @@ mod tests {
       ServerError::NotFound {
         message: "/app/foo not found".into(),
       },
+    );
+  }
+
+  #[test]
+  fn content_security_policy() {
+    assert_eq!(
+      Server::content_security_policy("0.0.0.0:80".parse().unwrap(), &Uri::from_static("/")),
+      "default-src 'self'"
+    );
+
+    let app = blake3::hash(b"app");
+    let content = blake3::hash(b"content");
+
+    assert_eq!(
+      Server::content_security_policy(
+        "0.0.0.0:80".parse().unwrap(),
+        &format!("/{app}/{content}/").parse().unwrap()
+      ),
+      format!("default-src http://0.0.0.0:80/{app}/{content}/"),
+    );
+
+    assert_eq!(
+      Server::content_security_policy("0.0.0.0:80".parse().unwrap(), &"/foo".parse().unwrap()),
+      "default-src",
     );
   }
 }

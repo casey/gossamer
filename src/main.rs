@@ -11,6 +11,7 @@ use {
     http::{
       self,
       header::{self, HeaderValue},
+      Uri,
     },
   },
   blake3::{Hash, Hasher},
