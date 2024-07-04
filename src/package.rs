@@ -254,17 +254,17 @@ impl Package {
         self.files.get(paths.get(path)?).unwrap().clone(),
       )),
       Manifest::Comic { pages } => {
-        let page = if path == "0" {
-          0
-        } else if path.starts_with('0') {
+        if path.len() > 1 && path.starts_with('0') {
           return None;
-        } else {
-          path.parse::<usize>().ok()?
-        };
+        }
 
         Some((
           mime::IMAGE_JPEG,
-          self.files.get(pages.get(page)?).unwrap().clone(),
+          self
+            .files
+            .get(pages.get(path.parse::<usize>().ok()?)?)
+            .unwrap()
+            .clone(),
         ))
       }
     }
