@@ -92,7 +92,7 @@ pub struct Package {
 }
 
 impl Package {
-  pub const MAGIC_BYTES: &'static str = "MEDIA📦\0";
+  pub const MAGIC_BYTES: &'static str = "MEDIA📦\r\n\x1a\n\0";
 
   pub fn load(path: &Utf8Path) -> Result<Self, Error> {
     let file = File::open(path)?;
@@ -160,7 +160,7 @@ impl Package {
 
       package.read_exact(&mut buffer)?;
 
-      let actual = blake3::hash(&buffer);
+      let actual = Hash::bytes(&buffer);
 
       ensure!(actual == expected, FileHashInvalid { expected, actual });
 
@@ -179,7 +179,7 @@ impl Package {
     let manifest: Manifest =
       ciborium::from_reader(Cursor::new(files.get(&hash).unwrap())).context(DeserializeManifest)?;
 
-    manifest.verify(hash, &files)?;
+    Self::verify(&files, &manifest, hash)?;
 
     Ok(Self {
       manifest,
@@ -211,11 +211,13 @@ impl Package {
       buffer
     };
 
-    let manifest_hash = blake3::hash(&manifest);
+    let manifest_hash = Hash::bytes(&manifest);
 
     hashes.push((manifest_hash, manifest.len().into_u64()));
 
     hashes.sort_by_key(|hash| *hash.0.as_bytes());
+
+    hashes.dedup();
 
     let index = hashes
       .iter()
@@ -269,6 +271,38 @@ impl Package {
       }
     }
   }
+
+  pub fn verify(
+    files: &HashMap<Hash, Vec<u8>>,
+    manifest: &Manifest,
+    manifest_hash: Hash,
+  ) -> Result<(), package::Error> {
+    let mut extra = 0u64;
+    let mut missing = 0u64;
+
+    let expected: HashSet<Hash> = match manifest {
+      Manifest::App { paths, .. } => paths.values().copied().collect(),
+      Manifest::Comic { pages } => pages.iter().copied().collect(),
+    };
+
+    for hash in &expected {
+      if !files.contains_key(hash) {
+        missing += 1;
+      }
+    }
+
+    ensure!(missing == 0, package::ManifestMissingFiles { missing });
+
+    for hash in files.keys() {
+      if *hash != manifest_hash && !expected.contains(hash) {
+        extra += 1;
+      }
+    }
+
+    ensure!(extra == 0, package::ManifestExtraFiles { extra });
+
+    Ok(())
+  }
 }
 
 #[cfg(test)]
@@ -286,7 +320,7 @@ mod tests {
     assert_matches!(
       Package::load(&package).unwrap_err(),
       Error::MagicBytes { bytes, .. }
-      if bytes == *b"this-is-no"
+      if bytes == *b"this-is-not-a-"
     );
   }
 
@@ -394,7 +428,7 @@ mod tests {
     assert_matches!(
       Package::load(&package).unwrap_err(),
       Error::FileHashInvalid { actual, expected, .. }
-      if actual == blake3::hash(&[]) && expected.as_bytes() == &[0; 32],
+      if actual == Hash::bytes(&[]) && expected.as_bytes() == &[0; 32],
     );
   }
 
@@ -432,7 +466,7 @@ mod tests {
     bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
     bytes.extend_from_slice(&1u64.to_le_bytes());
-    bytes.extend_from_slice(blake3::hash(&[]).as_bytes());
+    bytes.extend_from_slice(Hash::bytes(&[]).as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
     bytes.extend_from_slice(&[0]);
 
@@ -455,7 +489,7 @@ mod tests {
     bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
     bytes.extend_from_slice(&1u64.to_le_bytes());
-    bytes.extend_from_slice(blake3::hash(&[]).as_bytes());
+    bytes.extend_from_slice(Hash::bytes(&[]).as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
 
     fs::write(&package, bytes).unwrap();
@@ -478,8 +512,8 @@ mod tests {
     fs::write(root.join("index.html"), "html").unwrap();
     fs::write(root.join("index.js"), "js").unwrap();
 
-    let html = blake3::hash(b"html");
-    let js = blake3::hash(b"js");
+    let html = Hash::bytes(b"html");
+    let js = Hash::bytes(b"js");
 
     let manifest = Manifest::App {
       target: Target::Comic,
@@ -494,7 +528,7 @@ mod tests {
       buffer
     };
 
-    let hash = blake3::hash(&manifest_bytes);
+    let hash = Hash::bytes(&manifest_bytes);
 
     let hashes = vec![
       ("index.html".into(), (html, 4)),

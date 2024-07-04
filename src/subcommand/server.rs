@@ -16,6 +16,17 @@ use {
   },
 };
 
+struct Cbor<T>(T);
+
+impl<T: Serialize> IntoResponse for Cbor<T> {
+  fn into_response(self) -> Response {
+    let mut cbor = Vec::new();
+    ciborium::into_writer(&self.0, &mut cbor).unwrap();
+
+    ([(header::CONTENT_TYPE, "application/cbor")], cbor).into_response()
+  }
+}
+
 mod target_validator;
 
 #[derive(Parser)]
@@ -91,8 +102,12 @@ impl Server {
       axum_server::Server::bind(self.address)
         .serve(
           Router::new()
-            .route("/", get(Self::library))
-            .route("/:app/:content/", get(Self::root))
+            .route("/", get(Self::root))
+            .route("/favicon.ico", get(Self::favicon))
+            .route("/api/packages", get(Self::packages))
+            .route("/api/handlers", get(Self::handlers))
+            .route("/app/*path", get(Self::library_app))
+            .route("/:app/:content/", get(Self::app_root))
             .route("/:app/:content/api/manifest", get(Self::manifest))
             .route("/:app/:content/app/*path", get(Self::app))
             .route("/:app/:content/content/*path", get(Self::content))
@@ -119,18 +134,20 @@ impl Server {
   }
 
   fn content_security_policy(address: SocketAddr, uri: &Uri) -> HeaderValue {
-    static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
+    static APP: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
+    static ROOT: Lazy<Regex> = lazy_regex!("^/(app/.*)?$");
 
     let path = uri.path();
 
-    if path == "/" {
-      return HeaderValue::from_static("default-src 'self'");
+    if ROOT.is_match(path) {
+      return HeaderValue::from_static("default-src 'unsafe-eval' 'unsafe-inline' 'self'");
     }
 
-    RE.captures(path)
+    APP
+      .captures(path)
       .map(|captures| {
         HeaderValue::try_from(format!(
-          "default-src http://{address}/{}/{}/",
+          "default-src 'unsafe-eval' 'unsafe-inline' http://{address}/{}/{}/",
           &captures[1], &captures[2],
         ))
         .unwrap()
@@ -144,10 +161,22 @@ impl Server {
     })
   }
 
-  async fn library(library: Extension<Arc<Library>>) -> ServerResult {
+  async fn favicon(library: Extension<Arc<Library>>) -> ServerResult {
     Self::file(
       library
-        .handler(Target::Library)
+        .handler(Target::Root)
+        .ok_or_else(|| ServerError::NotFound {
+          message: "library handler not found".into(),
+        })?,
+      "",
+      "favicon.ico",
+    )
+  }
+
+  async fn root(library: Extension<Arc<Library>>) -> ServerResult {
+    Self::file(
+      library
+        .handler(Target::Root)
         .ok_or_else(|| ServerError::NotFound {
           message: "library handler not found".into(),
         })?,
@@ -156,7 +185,36 @@ impl Server {
     )
   }
 
-  async fn root(library: Extension<Arc<Library>>, Path((app, _content)): HashRoot) -> ServerResult {
+  async fn packages(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Hash, Manifest>> {
+    Cbor(
+      library
+        .packages()
+        .iter()
+        .map(|(hash, package)| (*hash, package.manifest.clone()))
+        .collect(),
+    )
+  }
+
+  async fn handlers(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Target, Hash>> {
+    Cbor(library.handlers().clone())
+  }
+
+  async fn library_app(library: Extension<Arc<Library>>, path: Path<String>) -> ServerResult {
+    Self::file(
+      library
+        .handler(Target::Root)
+        .ok_or_else(|| ServerError::NotFound {
+          message: "library handler not found".into(),
+        })?,
+      "/app/",
+      &path,
+    )
+  }
+
+  async fn app_root(
+    library: Extension<Arc<Library>>,
+    Path((app, _content)): HashRoot,
+  ) -> ServerResult {
     Self::file(Self::package(&library, app.0)?, "", "index.html")
   }
 
@@ -227,29 +285,33 @@ mod tests {
 
     library.add(PACKAGES.app().clone());
     library.add(PACKAGES.comic().clone());
-    library.add(PACKAGES.library().clone());
+    library.add(PACKAGES.root().clone());
 
     let library = Extension(Arc::new(library));
 
     let app = PACKAGES.app().hash;
     let comic = PACKAGES.comic().hash;
 
-    {
-      let library = Server::library(library.clone()).await.unwrap();
-      assert_eq!(library.content_type, mime::TEXT_HTML);
-      assert!(str::from_utf8(&library.content)
-        .unwrap()
-        .contains("Library!"));
-    }
+    let root = Server::root(library.clone()).await.unwrap();
+    assert_eq!(root.content_type, mime::TEXT_HTML);
+    assert!(str::from_utf8(&root.content)
+      .unwrap()
+      .contains("<title>Library</title>"));
 
-    let root = Server::root(
+    let favicon = Server::favicon(library.clone()).await.unwrap();
+    assert_eq!(favicon.content_type, "image/x-icon");
+    assert_eq!(&favicon.content[..4], b"\x89PNG");
+
+    let app_root = Server::app_root(
       library.clone(),
       Path((DeserializeFromStr(app), DeserializeFromStr(comic))),
     )
     .await
     .unwrap();
-    assert_eq!(root.content_type, mime::TEXT_HTML);
-    assert!(root.content.starts_with(b"<html>"));
+    assert_eq!(app_root.content_type, mime::TEXT_HTML);
+    assert!(str::from_utf8(&app_root.content)
+      .unwrap()
+      .contains("<title>Comic</title>"));
 
     let manifest = Server::manifest(
       library.clone(),
@@ -309,7 +371,7 @@ mod tests {
 
     assert_eq!(
       Server::content_security_policy(address, &Uri::from_static("/")),
-      "default-src 'self'"
+      "default-src 'unsafe-eval' 'unsafe-inline' 'self'"
     );
 
     let app = PACKAGES.app().hash;
@@ -317,7 +379,7 @@ mod tests {
 
     assert_eq!(
       Server::content_security_policy(address, &format!("/{app}/{content}/").parse().unwrap()),
-      format!("default-src http://{address}/{app}/{content}/"),
+      format!("default-src 'unsafe-eval' 'unsafe-inline' http://{address}/{app}/{content}/"),
     );
 
     assert_eq!(

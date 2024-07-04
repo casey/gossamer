@@ -60,13 +60,10 @@ impl Package {
 
       let len = file.metadata().context(context)?.len();
 
-      let mut hasher = Hasher::new();
-
-      hasher.update_reader(file).context(context)?;
-
-      let hash = hasher.finalize();
-
-      hashes.insert(relative.clone(), (hash, len));
+      hashes.insert(
+        relative.clone(),
+        (Hash::reader(file).context(context)?, len),
+      );
     }
 
     Ok(hashes)
@@ -106,7 +103,7 @@ mod tests {
 
   #[test]
   fn package() {
-    for root in ["apps/comic", "content/comic"] {
+    for root in ["tests/packages/app-comic", "tests/packages/comic"] {
       let tempdir = tempdir();
 
       let result = Package {
@@ -260,7 +257,7 @@ mod tests {
       buffer
     };
 
-    let manifest = blake3::hash(&manifest_bytes);
+    let manifest = Hash::bytes(&manifest_bytes);
 
     let Manifest::App { target, paths } = package.manifest else {
       panic!("unexpected manifest type");
@@ -268,8 +265,8 @@ mod tests {
 
     assert_eq!(target, Target::Comic);
 
-    let foo = blake3::hash("foo".as_bytes());
-    let bar = blake3::hash("bar".as_bytes());
+    let foo = Hash::bytes("foo".as_bytes());
+    let bar = Hash::bytes("bar".as_bytes());
 
     assert_eq!(paths.len(), 2);
     assert_eq!(paths["index.html"], foo);
@@ -278,6 +275,31 @@ mod tests {
     assert_eq!(package.files[&foo], "foo".as_bytes());
     assert_eq!(package.files[&bar], "bar".as_bytes());
     assert_eq!(package.files[&manifest], manifest_bytes);
+  }
+
+  #[test]
+  fn files_are_deduplicated() {
+    let tempdir = tempdir();
+
+    let root = tempdir.path_utf8().join("root");
+    let output = tempdir.path_utf8().join("output.package");
+
+    fs::create_dir(&root).unwrap();
+
+    fs::write(root.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
+    fs::write(root.join("index.html"), "foo").unwrap();
+    fs::write(root.join("index.js"), "foo").unwrap();
+
+    Package {
+      root: root.clone(),
+      output: output.clone(),
+    }
+    .run()
+    .unwrap_or_display();
+
+    let package = super::super::Package::load(&output).unwrap_or_display();
+
+    assert_eq!(package.files.len(), 2);
   }
 
   #[test]
@@ -310,14 +332,14 @@ mod tests {
       buffer
     };
 
-    let manifest = blake3::hash(&manifest_bytes);
+    let manifest = Hash::bytes(&manifest_bytes);
 
     let Manifest::Comic { pages } = package.manifest else {
       panic!("unexpected manifest type");
     };
 
-    let foo = blake3::hash("foo".as_bytes());
-    let bar = blake3::hash("bar".as_bytes());
+    let foo = Hash::bytes("foo".as_bytes());
+    let bar = Hash::bytes("bar".as_bytes());
 
     assert_eq!(pages.len(), 2);
     assert_eq!(pages[0], foo);

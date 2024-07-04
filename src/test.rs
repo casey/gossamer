@@ -36,26 +36,26 @@ pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
 
   let app = path.join("app.package");
 
-  let library = path.join("library.package");
+  let root = path.join("root.package");
 
   let comic = path.join("comic.package");
 
   subcommand::package::Package {
-    root: "apps/comic".into(),
+    root: "tests/packages/app-comic".into(),
     output: app.clone(),
   }
   .run()
   .unwrap();
 
   subcommand::package::Package {
-    root: "apps/library".into(),
-    output: library.clone(),
+    root: "tests/packages/app-root".into(),
+    output: root.clone(),
   }
   .run()
   .unwrap();
 
   subcommand::package::Package {
-    root: "content/comic".into(),
+    root: "tests/packages/comic".into(),
     output: comic.clone(),
   }
   .run()
@@ -64,13 +64,13 @@ pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
   Packages {
     dir,
     app: Package::load(&app).unwrap(),
-    library: Package::load(&library).unwrap(),
+    root: Package::load(&root).unwrap(),
     comic: Package::load(&comic).unwrap(),
   }
 });
 
 pub struct Packages {
-  library: Package,
+  root: Package,
   app: Package,
   comic: Package,
   #[allow(unused)]
@@ -82,8 +82,8 @@ impl Packages {
     &self.app
   }
 
-  pub fn library(&self) -> &Package {
-    &self.library
+  pub fn root(&self) -> &Package {
+    &self.root
   }
 
   pub fn comic(&self) -> &Package {

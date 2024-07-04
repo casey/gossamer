@@ -1,21 +1,24 @@
 [package]
-name = "media"
-description = "Media package format and server"
+name = "gossamer"
+description = "media server"
 version = "0.0.0"
 license = "CC0-1.0"
 edition = "2021"
-homepage = "https://github.com/casey/media"
-repository = "https://github.com/casey/media"
+homepage = "https://github.com/casey/gossamer"
+repository = "https://github.com/casey/gossamer"
+
+[workspace]
+members = [".", "crates/*"]
 
 [dependencies]
 axum = { version = "0.7.5", features = ["http2"] }
 axum-server = "0.6.0"
-blake3 = { version = "1.5", features = ["serde"] }
 camino = "1.1"
-ciborium = "0.2.2"
+ciborium = "0.2"
 clap = { version = "4.5", features = ["derive"] }
 hex = "0.4.3"
 libc = "0.2.155"
+media = { path = "crates/media" }
 mime_guess = "2.0.4"
 open = "5.2.0"
 regex = "1.10.5"

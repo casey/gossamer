@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+    </style>
+  </head>
+  <body>
+    <ul>
+%% for (hash, manifest) in &self.packages {
+%%   let ty = manifest.ty();
+      <li>
+        <dl>
+          <dt>hash</dt><dd>{{hash}}</dd>
+          <dt>type</dt><dd>{{ty}}</dd>
+%%   if let Some(handler) = self.handlers.get(&ty.into()) {
+          <dt>open</dt>
+          <dd>
+            <button data-handler={{handler}} data-package={{hash}}>open</button>
+          </dd>
+%%   }
+        </dl>
+      </li>
+%% }
+    </ul>
+    <iframe></iframe>
+  </body>
+</html>
