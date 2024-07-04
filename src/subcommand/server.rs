@@ -149,7 +149,7 @@ impl Server {
       library
         .handler(Target::Library)
         .ok_or_else(|| ServerError::NotFound {
-          message: format!("library handler not found"),
+          message: "library handler not found".into(),
         })?,
       "",
       "index.html",
