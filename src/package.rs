@@ -253,14 +253,20 @@ impl Package {
         mime_guess::from_path(path).first_or_octet_stream(),
         self.files.get(paths.get(path)?).unwrap().clone(),
       )),
-      Manifest::Comic { pages } => Some((
-        mime::IMAGE_JPEG,
-        self
-          .files
-          .get(pages.get(path.parse::<usize>().ok()?)?)
-          .unwrap()
-          .clone(),
-      )),
+      Manifest::Comic { pages } => {
+        if path.len() > 1 && path.starts_with('0') {
+          return None;
+        }
+
+        Some((
+          mime::IMAGE_JPEG,
+          self
+            .files
+            .get(pages.get(path.parse::<usize>().ok()?)?)
+            .unwrap()
+            .clone(),
+        ))
+      }
     }
   }
 }
@@ -513,5 +519,10 @@ mod tests {
         hash,
       },
     );
+  }
+
+  #[test]
+  fn comic_page_numbers_may_not_have_leading_zeros() {
+    assert!(PACKAGES.comic().file("00").is_none());
   }
 }
