@@ -9,8 +9,9 @@ use {
   },
   tokio::runtime::Runtime,
   tower_http::{
-    propagate_header::PropagateHeaderLayer, set_header::SetRequestHeaderLayer,
-    validate_request::ValidateRequestHeaderLayer,
+    propagate_header::PropagateHeaderLayer,
+    set_header::SetRequestHeaderLayer,
+    validate_request::{ValidateRequest, ValidateRequestHeaderLayer},
   },
 };
 
@@ -67,6 +68,59 @@ impl IntoResponse for ServerError {
 
 type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
+#[derive(Clone)]
+struct Validator(Arc<Library>);
+
+impl ValidateRequest<Body> for Validator {
+  type ResponseBody = Body;
+
+  fn validate(
+    &mut self,
+    request: &mut http::Request<Body>,
+  ) -> Result<(), Response<Self::ResponseBody>> {
+    let path = request.uri().path();
+
+    static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/.*$");
+
+    fn packages<'a>(library: &'a Library, path: &str) -> Option<(&'a Package, &'a Package)> {
+      let captures = dbg!(RE.captures(dbg!(path)))?;
+
+      let app = library.package(captures[1].parse().unwrap())?;
+      let content = library.package(captures[2].parse().unwrap())?;
+
+      Some((app, content))
+    }
+
+    if let Some((app, content)) = packages(&self.0, path) {
+      match app.manifest {
+        Manifest::App { target, .. } => {
+          let content = content.manifest.ty();
+
+          let matched = match target {
+            Target::Library => false,
+            Target::Comic => content == Type::Comic,
+          };
+
+          if !matched {
+            return Err((StatusCode::BAD_REQUEST, format!("content package of type `{content}` cannot be opened by app with target `{target}`")).into_response());
+          }
+        }
+        _ => {
+          return Err(
+            (
+              StatusCode::BAD_REQUEST,
+              format!("app package is of type `{}`, not `app`", app.manifest.ty()),
+            )
+              .into_response(),
+          )
+        }
+      };
+    }
+
+    Ok(())
+  }
+}
+
 impl Server {
   pub fn run(self) -> Result {
     let mut library = Library::default();
@@ -81,27 +135,7 @@ impl Server {
       open::that(&url).context(error::Open { url: &url })?;
     }
 
-    // if let (Some(app), Some(content)) = (&app, &content) {
-    //   match app.manifest {
-    //     Manifest::App { target, .. } => {
-    //       let content = content.manifest.ty();
-    //       ensure!(
-    //         match target {
-    //           Target::App => content == Type::App,
-    //           Target::Library => todo!(),
-    //           Target::Comic => content == Type::Comic,
-    //         },
-    //         error::Target { content, target }
-    //       );
-    //     }
-    //     _ => {
-    //       return error::AppType {
-    //         ty: app.manifest.ty(),
-    //       }
-    //       .fail()
-    //     }
-    //   };
-    // }
+    let library = Arc::new(library);
 
     Runtime::new().context(error::Runtime)?.block_on(async {
       axum_server::Server::bind(self.address)
@@ -119,10 +153,10 @@ impl Server {
                 Some(Self::content_security_policy(self.address, request))
               },
             ))
-            .layer(ValidateRequestHeaderLayer::custom(
-              |request: &mut http::Request<Body>| todo!(),
-            ))
-            .layer(Extension(Arc::new(library)))
+            .layer(ValidateRequestHeaderLayer::custom(Validator(
+              library.clone(),
+            )))
+            .layer(Extension(library))
             .into_make_service(),
         )
         .await
@@ -172,18 +206,17 @@ impl Server {
     )
   }
 
-  async fn root(library: Extension<Arc<Library>>, hash_root: HashRoot) -> ServerResult {
-    Self::file(
-      Self::package(&library, hash_root.0 .0 .0)?,
-      "",
-      "index.html",
-    )
+  async fn root(library: Extension<Arc<Library>>, Path((app, _content)): HashRoot) -> ServerResult {
+    Self::file(Self::package(&library, app.0)?, "", "index.html")
   }
 
-  async fn manifest(library: Extension<Arc<Library>>, hash_root: HashRoot) -> ServerResult {
+  async fn manifest(
+    library: Extension<Arc<Library>>,
+    Path((_app, content)): HashRoot,
+  ) -> ServerResult {
     Ok(Resource::new(
       mime::APPLICATION_JSON,
-      serde_json::to_vec(&Self::package(&library, hash_root.0 .1 .0)?.manifest).unwrap(),
+      serde_json::to_vec(&Self::package(&library, content.0)?.manifest).unwrap(),
     ))
   }
 
@@ -248,10 +281,6 @@ mod tests {
     }
 
     packages.as_ref().unwrap().path_utf8().into()
-  }
-
-  fn content_package() -> Utf8PathBuf {
-    packages().join("content.package")
   }
 
   fn app_package() -> Utf8PathBuf {
@@ -385,5 +414,58 @@ mod tests {
         message: "/app/foo not found".into(),
       },
     );
+  }
+
+  #[test]
+  fn validator() {
+    let app_package = Package::load(&packages().join("app.package")).unwrap();
+    let content_package = Package::load(&packages().join("content.package")).unwrap();
+    let library_package = Package::load(&packages().join("library.package")).unwrap();
+
+    let app = app_package.hash;
+    let content = content_package.hash;
+    let library_hash = library_package.hash;
+
+    let mut library = Library::default();
+
+    library.add(app_package);
+    library.add(content_package);
+    library.add(library_package);
+
+    let library = Arc::new(library);
+
+    let mut validator = Validator(library);
+
+    let mut request = http::Request::builder()
+      .method("GET")
+      .uri("https://example.com/")
+      .body(Body::empty())
+      .unwrap();
+
+    validator.validate(&mut request).unwrap();
+
+    let mut request = http::Request::builder()
+      .method("GET")
+      .uri(format!("https://example.com/{app}/{content}/"))
+      .body(Body::empty())
+      .unwrap();
+
+    validator.validate(&mut request).unwrap();
+
+    let mut request = http::Request::builder()
+      .method("GET")
+      .uri(format!("https://example.com/{library_hash}/{content}/"))
+      .body(Body::empty())
+      .unwrap();
+
+    validator.validate(&mut request).unwrap_err();
+
+    let mut request = http::Request::builder()
+      .method("GET")
+      .uri(format!("https://example.com/{content}/{content}/"))
+      .body(Body::empty())
+      .unwrap();
+
+    validator.validate(&mut request).unwrap_err();
   }
 }

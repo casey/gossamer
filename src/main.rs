@@ -15,7 +15,7 @@ use {
   },
   blake3::{Hash, Hasher},
   camino::{Utf8Path, Utf8PathBuf},
-  clap::{ArgGroup, Parser},
+  clap::Parser,
   libc::EXIT_FAILURE,
   mime_guess::{mime, Mime},
   regex::Regex,
