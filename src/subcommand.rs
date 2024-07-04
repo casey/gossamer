@@ -6,7 +6,7 @@ use {
   },
 };
 
-mod package;
+pub mod package;
 mod server;
 
 #[derive(Parser)]

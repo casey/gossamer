@@ -1,6 +1,6 @@
 use super::*;
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Manifest {
   App {

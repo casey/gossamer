@@ -84,7 +84,7 @@ pub enum Error {
   },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Package {
   pub files: HashMap<Hash, Vec<u8>>,
   pub hash: Hash,

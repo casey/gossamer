@@ -26,3 +26,20 @@ impl Library {
       .map(|hash| self.packages.get(hash).unwrap())
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn add() {
+    let mut library = Library::default();
+
+    let package = Package::load(&packages().join("app.package")).unwrap();
+
+    library.add(package.clone());
+
+    assert_eq!(library.package(package.hash), Some(&package));
+    assert_eq!(library.handler(Target::Comic), Some(&package));
+  }
+}
