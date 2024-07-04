@@ -84,9 +84,10 @@ pub enum Error {
   },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Package {
   pub files: HashMap<Hash, Vec<u8>>,
+  pub hash: Hash,
   pub manifest: Manifest,
 }
 
@@ -147,7 +148,7 @@ impl Package {
       hashes.push((hash, len));
     }
 
-    let manifest_hash = hashes
+    let hash = hashes
       .get(index)
       .context(ManifestIndexOutOfBounds { index })?
       .0;
@@ -175,12 +176,16 @@ impl Package {
       }
     );
 
-    let manifest: Manifest = ciborium::from_reader(Cursor::new(files.get(&manifest_hash).unwrap()))
-      .context(DeserializeManifest)?;
+    let manifest: Manifest =
+      ciborium::from_reader(Cursor::new(files.get(&hash).unwrap())).context(DeserializeManifest)?;
 
-    manifest.verify(manifest_hash, &files)?;
+    manifest.verify(hash, &files)?;
 
-    Ok(Self { manifest, files })
+    Ok(Self {
+      manifest,
+      files,
+      hash,
+    })
   }
 
   pub fn save(
@@ -471,7 +476,7 @@ mod tests {
     let js = blake3::hash(b"js");
 
     let manifest = Manifest::App {
-      handles: Type::Comic,
+      target: Target::Comic,
       paths: vec![("index.html".into(), html), ("index.js".into(), js)]
         .into_iter()
         .collect(),
@@ -482,6 +487,8 @@ mod tests {
       ciborium::into_writer(&manifest, &mut buffer).unwrap();
       buffer
     };
+
+    let hash = blake3::hash(&manifest_bytes);
 
     let hashes = vec![
       ("index.html".into(), (html, 4)),
@@ -498,11 +505,12 @@ mod tests {
         files: vec![
           (html, b"html".into()),
           (js, b"js".into()),
-          (blake3::hash(&manifest_bytes), manifest_bytes)
+          (hash, manifest_bytes)
         ]
         .into_iter()
         .collect(),
         manifest,
+        hash,
       },
     );
   }

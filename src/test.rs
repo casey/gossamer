@@ -31,3 +31,38 @@ macro_rules! assert_matches {
     }
   }
 }
+
+static PACKAGES: Mutex<Option<TempDir>> = Mutex::new(None);
+
+pub fn packages() -> Utf8PathBuf {
+  let mut packages = PACKAGES.lock().unwrap();
+
+  if packages.is_none() {
+    let tempdir = tempdir();
+
+    subcommand::package::Package {
+      root: "apps/comic".into(),
+      output: tempdir.path_utf8().join("app.package"),
+    }
+    .run()
+    .unwrap();
+
+    subcommand::package::Package {
+      root: "apps/library".into(),
+      output: tempdir.path_utf8().join("library.package"),
+    }
+    .run()
+    .unwrap();
+
+    subcommand::package::Package {
+      root: "content/comic".into(),
+      output: tempdir.path_utf8().join("content.package"),
+    }
+    .run()
+    .unwrap();
+
+    *packages = Some(tempdir);
+  }
+
+  packages.as_ref().unwrap().path_utf8().into()
+}

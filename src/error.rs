@@ -8,14 +8,6 @@ pub enum Error {
     backtrace: Option<Backtrace>,
     ty: Type,
   },
-  #[snafu(display(
-    "content package of type `{content}` cannot be opened by app that handles `{handles}`"
-  ))]
-  ContentType {
-    backtrace: Option<Backtrace>,
-    content: Type,
-    handles: Type,
-  },
   #[snafu(display("failed to get current directory"))]
   CurrentDir {
     backtrace: Option<Backtrace>,
@@ -53,6 +45,12 @@ pub enum Error {
   NoPages {
     backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
+  },
+  #[snafu(display("failed to open `{url}`"))]
+  Open {
+    backtrace: Option<Backtrace>,
+    source: io::Error,
+    url: String,
   },
   #[snafu(display("package output `{output}` may not be in `{root}`"))]
   OutputInRoot {

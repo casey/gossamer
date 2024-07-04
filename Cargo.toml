@@ -1,7 +1,11 @@
 [package]
 name = "media"
+description = "Media package format and server"
 version = "0.0.0"
+license = "CC0-1.0"
 edition = "2021"
+homepage = "https://github.com/casey/media"
+repository = "https://github.com/casey/media"
 
 [dependencies]
 axum = { version = "0.7.5", features = ["http2"] }
@@ -13,11 +17,14 @@ clap = { version = "4.5", features = ["derive"] }
 hex = "0.4.3"
 libc = "0.2.155"
 mime_guess = "2.0.4"
+open = "5.2.0"
 regex = "1.10.5"
+regex_static = "0.1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.119"
 serde_yaml = "0.9.34"
 snafu = { version = "0.8.3", features = ["backtrace"] }
 tempfile = "3.10.1"
 tokio = { version = "1.38.0", features = ["rt-multi-thread"] }
+tower-http = { version = "0.5.2", features = ["propagate-header", "set-header", "validate-request"] }
 walkdir = "2.5"

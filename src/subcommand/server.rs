@@ -1,24 +1,35 @@
-use super::*;
+use {
+  self::target_validator::TargetValidator,
+  super::*,
+  axum::{
+    extract::{Extension, Path},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+  },
+  tokio::runtime::Runtime,
+  tower_http::{
+    propagate_header::PropagateHeaderLayer,
+    set_header::SetRequestHeaderLayer,
+    validate_request::{ValidateRequest, ValidateRequestHeaderLayer},
+  },
+};
+
+mod target_validator;
 
 #[derive(Parser)]
 pub struct Server {
   #[arg(long, help = "Listen on <ADDRESS> for incoming requests.")]
   address: SocketAddr,
-  #[arg(
-    long,
-    help = "Serve contents with app <PACKAGE>.",
-    value_name = "PACKAGE"
-  )]
-  app: Utf8PathBuf,
-  #[arg(long, help = "Serve contents of <PACKAGE>.", value_name = "PACKAGE")]
-  content: Utf8PathBuf,
+  #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>", num_args = 0..)]
+  packages: Vec<Utf8PathBuf>,
+  #[arg(long, help = "Open server in browser.")]
+  open: bool,
 }
 
-#[derive(Debug)]
-struct State {
-  app: Package,
-  content: Package,
-}
+type HashPath = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>, String)>;
+type HashRoot = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>)>;
 
 #[derive(Debug)]
 struct Resource {
@@ -36,7 +47,7 @@ impl Resource {
 }
 
 impl IntoResponse for Resource {
-  fn into_response(self) -> axum::http::Response<axum::body::Body> {
+  fn into_response(self) -> Response<Body> {
     (
       [(header::CONTENT_TYPE, self.content_type.to_string())],
       self.content,
@@ -47,55 +58,55 @@ impl IntoResponse for Resource {
 
 #[derive(Debug, PartialEq)]
 pub enum ServerError {
-  NotFound { path: String },
+  NotFound { message: String },
 }
 
 impl IntoResponse for ServerError {
   fn into_response(self) -> Response {
     match self {
-      Self::NotFound { path } => {
-        (StatusCode::NOT_FOUND, format!("{path} not found")).into_response()
-      }
+      Self::NotFound { message } => (StatusCode::NOT_FOUND, message).into_response(),
     }
   }
 }
 
-type ServerResult = std::result::Result<Resource, ServerError>;
+type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 impl Server {
   pub fn run(self) -> Result {
-    let app = Package::load(&self.app).context(error::PackageLoad { path: &self.app })?;
-    let content = Package::load(&self.content).context(error::PackageLoad {
-      path: &self.content,
-    })?;
+    let mut library = Library::default();
 
-    match app.manifest {
-      Manifest::App { handles, .. } => {
-        ensure!(
-          content.manifest.ty() == handles,
-          error::ContentType {
-            content: content.manifest.ty(),
-            handles,
-          }
-        );
-      }
-      _ => {
-        return error::AppType {
-          ty: app.manifest.ty(),
-        }
-        .fail()
-      }
+    for path in &self.packages {
+      let package = Package::load(path).context(error::PackageLoad { path })?;
+      library.add(package);
     }
+
+    if self.open {
+      let url = format!("http://{}/", self.address);
+      open::that(&url).context(error::Open { url: &url })?;
+    }
+
+    let library = Arc::new(library);
 
     Runtime::new().context(error::Runtime)?.block_on(async {
       axum_server::Server::bind(self.address)
         .serve(
           Router::new()
-            .route("/", get(Self::root))
-            .route("/api/manifest", get(Self::manifest))
-            .route("/app/*path", get(Self::app))
-            .route("/content/*path", get(Self::content))
-            .layer(Extension(Arc::new(State { app, content })))
+            .route("/", get(Self::library))
+            .route("/:app/:content/", get(Self::root))
+            .route("/:app/:content/api/manifest", get(Self::manifest))
+            .route("/:app/:content/app/*path", get(Self::app))
+            .route("/:app/:content/content/*path", get(Self::content))
+            .layer(PropagateHeaderLayer::new(header::CONTENT_SECURITY_POLICY))
+            .layer(SetRequestHeaderLayer::overriding(
+              header::CONTENT_SECURITY_POLICY,
+              move |request: &http::Request<Body>| {
+                Some(Self::content_security_policy(self.address, request.uri()))
+              },
+            ))
+            .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
+              library.clone(),
+            )))
+            .layer(Extension(library))
             .into_make_service(),
         )
         .await
@@ -107,33 +118,77 @@ impl Server {
     Ok(())
   }
 
-  async fn manifest(Extension(state): Extension<Arc<State>>) -> Resource {
-    Resource::new(
-      mime::APPLICATION_JSON,
-      serde_json::to_vec(&state.content.manifest).unwrap(),
+  fn content_security_policy(address: SocketAddr, uri: &Uri) -> HeaderValue {
+    static RE: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
+
+    let path = uri.path();
+
+    if path == "/" {
+      return HeaderValue::from_static("default-src 'self'");
+    }
+
+    RE.captures(path)
+      .map(|captures| {
+        HeaderValue::try_from(format!(
+          "default-src http://{address}/{}/{}/",
+          &captures[1], &captures[2],
+        ))
+        .unwrap()
+      })
+      .unwrap_or_else(|| HeaderValue::from_static("default-src"))
+  }
+
+  fn package(library: &Library, hash: Hash) -> ServerResult<&Package> {
+    library.package(hash).ok_or_else(|| ServerError::NotFound {
+      message: format!("package {hash} not found"),
+    })
+  }
+
+  async fn library(library: Extension<Arc<Library>>) -> ServerResult {
+    Self::file(
+      library
+        .handler(Target::Library)
+        .ok_or_else(|| ServerError::NotFound {
+          message: "library handler not found".into(),
+        })?,
+      "",
+      "index.html",
     )
   }
 
-  async fn root(Extension(state): Extension<Arc<State>>) -> ServerResult {
-    Self::file(&state.app, "", "index.html")
+  async fn root(library: Extension<Arc<Library>>, Path((app, _content)): HashRoot) -> ServerResult {
+    Self::file(Self::package(&library, app.0)?, "", "index.html")
   }
 
-  async fn app(Extension(state): Extension<Arc<State>>, Path(path): Path<String>) -> ServerResult {
-    Self::file(&state.app, "/app/", &path)
+  async fn manifest(
+    library: Extension<Arc<Library>>,
+    Path((_app, content)): HashRoot,
+  ) -> ServerResult {
+    Ok(Resource::new(
+      mime::APPLICATION_JSON,
+      serde_json::to_vec(&Self::package(&library, content.0)?.manifest).unwrap(),
+    ))
+  }
+
+  async fn app(
+    library: Extension<Arc<Library>>,
+    Path((app, _content, path)): HashPath,
+  ) -> ServerResult {
+    Self::file(Self::package(&library, app.0)?, "/app/", &path)
   }
 
   async fn content(
-    Extension(state): Extension<Arc<State>>,
-    Path(path): Path<String>,
+    library: Extension<Arc<Library>>,
+    Path((_app, content, path)): HashPath,
   ) -> ServerResult {
-    Self::file(&state.content, "/content/", &path)
+    Self::file(Self::package(&library, content.0)?, "/content/", &path)
   }
 
   fn file(package: &Package, prefix: &str, path: &str) -> ServerResult {
     match package.file(path) {
       Some((content_type, content)) => Ok(Resource::new(content_type, content)),
       None => Err(ServerError::NotFound {
-        path: format!("{prefix}{path}"),
+        message: format!("{prefix}{path} not found"),
       }),
     }
   }
@@ -142,38 +197,6 @@ impl Server {
 #[cfg(test)]
 mod tests {
   use super::*;
-
-  static PACKAGES: Mutex<Option<TempDir>> = Mutex::new(None);
-
-  fn packages() -> Utf8PathBuf {
-    let mut packages = PACKAGES.lock().unwrap();
-
-    if packages.is_none() {
-      let tempdir = tempdir();
-
-      subcommand::package::Package {
-        root: "apps/comic".into(),
-        output: tempdir.path_utf8().join("app.package"),
-      }
-      .run()
-      .unwrap();
-
-      subcommand::package::Package {
-        root: "content/comic".into(),
-        output: tempdir.path_utf8().join("content.package"),
-      }
-      .run()
-      .unwrap();
-
-      *packages = Some(tempdir);
-    }
-
-    packages.as_ref().unwrap().path_utf8().into()
-  }
-
-  fn content_package() -> Utf8PathBuf {
-    packages().join("content.package")
-  }
 
   fn app_package() -> Utf8PathBuf {
     packages().join("app.package")
@@ -189,8 +212,8 @@ mod tests {
     assert_matches!(
       Server {
         address: "0.0.0.0:80".parse().unwrap(),
-        app: app.clone(),
-        content,
+        packages: vec![app.clone(), content],
+        open: false,
       }
       .run()
       .unwrap_err(),
@@ -208,8 +231,8 @@ mod tests {
     assert_matches!(
       Server {
         address: "0.0.0.0:80".parse().unwrap(),
-        app: app_package(),
-        content: content.clone(),
+        packages: vec![app_package(), content.clone()],
+        open: false,
       }
       .run()
       .unwrap_err(),
@@ -218,51 +241,50 @@ mod tests {
     );
   }
 
-  #[test]
-  fn app_package_is_not_app() {
-    assert_matches!(
-      Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        app: content_package(),
-        content: content_package(),
-      }
-      .run()
-      .unwrap_err(),
-      Error::AppType { ty, .. }
-      if ty == Type::Comic,
-    );
-  }
-
-  #[test]
-  fn app_doesnt_handle_content_type() {
-    assert_matches!(
-      Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        app: app_package(),
-        content: app_package(),
-      }
-      .run()
-      .unwrap_err(),
-      Error::ContentType {
-        content: Type::App,
-        handles: Type::Comic,
-        ..
-      }
-    );
-  }
-
   #[tokio::test]
   async fn routes() {
-    let state = Extension(Arc::new(State {
-      app: Package::load(&app_package()).unwrap(),
-      content: Package::load(&content_package()).unwrap(),
-    }));
+    fn hash_path(app: Hash, content: Hash, path: String) -> HashPath {
+      Path((DeserializeFromStr(app), DeserializeFromStr(content), path))
+    }
 
-    let root = Server::root(state.clone()).await.unwrap();
+    let app_package = Package::load(&packages().join("app.package")).unwrap();
+    let content_package = Package::load(&packages().join("content.package")).unwrap();
+    let library_package = Package::load(&packages().join("library.package")).unwrap();
+
+    let app = app_package.hash;
+    let content = content_package.hash;
+
+    let mut library = Library::default();
+
+    library.add(app_package);
+    library.add(content_package);
+    library.add(library_package);
+
+    let library = Extension(Arc::new(library));
+
+    {
+      let library = Server::library(library.clone()).await.unwrap();
+      assert_eq!(library.content_type, mime::TEXT_HTML);
+      assert!(str::from_utf8(&library.content)
+        .unwrap()
+        .contains("Library!"));
+    }
+
+    let root = Server::root(
+      library.clone(),
+      Path((DeserializeFromStr(app), DeserializeFromStr(content))),
+    )
+    .await
+    .unwrap();
     assert_eq!(root.content_type, mime::TEXT_HTML);
     assert!(root.content.starts_with(b"<html>"));
 
-    let manifest = Server::manifest(state.clone()).await;
+    let manifest = Server::manifest(
+      library.clone(),
+      Path((DeserializeFromStr(app), DeserializeFromStr(content))),
+    )
+    .await
+    .unwrap();
     assert_eq!(manifest.content_type, mime::APPLICATION_JSON);
     assert!(
       manifest.content.starts_with(b"{\"type\":\"comic\""),
@@ -270,42 +292,66 @@ mod tests {
       String::from_utf8(manifest.content).unwrap()
     );
 
-    let app = Server::app(state.clone(), Path("index.js".into()))
+    let index_js = Server::app(library.clone(), hash_path(app, content, "index.js".into()))
       .await
       .unwrap();
-    assert_eq!(app.content_type, mime::TEXT_JAVASCRIPT);
+    assert_eq!(index_js.content_type, mime::TEXT_JAVASCRIPT);
     assert!(
-      app.content.starts_with(b"const response ="),
+      index_js.content.starts_with(b"const response ="),
       "{}",
-      String::from_utf8(app.content).unwrap()
+      String::from_utf8(index_js.content).unwrap()
     );
 
-    let content = Server::content(state.clone(), Path("0".into()))
+    let page0 = Server::content(library.clone(), hash_path(app, content, "0".into()))
       .await
       .unwrap();
-    assert_eq!(content.content_type, mime::IMAGE_JPEG);
+    assert_eq!(page0.content_type, mime::IMAGE_JPEG);
     assert!(
-      content.content.starts_with(b"\xff\xd8\xff\xe0\x00\x10JFIF"),
+      page0.content.starts_with(b"\xff\xd8\xff\xe0\x00\x10JFIF"),
       "{}",
-      String::from_utf8_lossy(&content.content),
+      String::from_utf8_lossy(&page0.content),
     );
 
     assert_eq!(
-      Server::content(state.clone(), Path("foo".into()))
+      Server::content(library.clone(), hash_path(app, content, "foo".into()))
         .await
         .unwrap_err(),
       ServerError::NotFound {
-        path: "/content/foo".into(),
+        message: "/content/foo not found".into(),
       },
     );
 
     assert_eq!(
-      Server::app(state.clone(), Path("foo".into()))
+      Server::app(library.clone(), hash_path(app, content, "foo".into()))
         .await
         .unwrap_err(),
       ServerError::NotFound {
-        path: "/app/foo".into(),
+        message: "/app/foo not found".into(),
       },
+    );
+  }
+
+  #[test]
+  fn content_security_policy() {
+    assert_eq!(
+      Server::content_security_policy("0.0.0.0:80".parse().unwrap(), &Uri::from_static("/")),
+      "default-src 'self'"
+    );
+
+    let app = blake3::hash(b"app");
+    let content = blake3::hash(b"content");
+
+    assert_eq!(
+      Server::content_security_policy(
+        "0.0.0.0:80".parse().unwrap(),
+        &format!("/{app}/{content}/").parse().unwrap()
+      ),
+      format!("default-src http://0.0.0.0:80/{app}/{content}/"),
+    );
+
+    assert_eq!(
+      Server::content_security_policy("0.0.0.0:80".parse().unwrap(), &"/foo".parse().unwrap()),
+      "default-src",
     );
   }
 }
