@@ -8,14 +8,6 @@ pub enum Error {
     backtrace: Option<Backtrace>,
     ty: Type,
   },
-  #[snafu(display(
-    "content package of type `{content}` cannot be opened by app with target `{target}`"
-  ))]
-  Target {
-    backtrace: Option<Backtrace>,
-    content: Type,
-    target: crate::Target,
-  },
   #[snafu(display("failed to get current directory"))]
   CurrentDir {
     backtrace: Option<Backtrace>,
