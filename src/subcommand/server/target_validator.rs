@@ -59,9 +59,9 @@ mod tests {
 
   #[test]
   fn validator() {
-    let app_package = Package::load(&packages().join("app.package")).unwrap();
-    let content_package = Package::load(&packages().join("content.package")).unwrap();
-    let library_package = Package::load(&packages().join("library.package")).unwrap();
+    let app_package = PACKAGES.app();
+    let content_package = PACKAGES.comic();
+    let library_package = PACKAGES.library();
 
     let app = app_package.hash;
     let content = content_package.hash;
@@ -69,9 +69,9 @@ mod tests {
 
     let mut library = Library::default();
 
-    library.add(app_package);
-    library.add(content_package);
-    library.add(library_package);
+    library.add(app_package.clone());
+    library.add(content_package.clone());
+    library.add(library_package.clone());
 
     let library = Arc::new(library);
 
