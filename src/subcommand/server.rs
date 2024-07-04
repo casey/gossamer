@@ -69,9 +69,9 @@ impl IntoResponse for ServerError {
 type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 #[derive(Clone)]
-struct Validator(Arc<Library>);
+struct TargetValidator(Arc<Library>);
 
-impl ValidateRequest<Body> for Validator {
+impl ValidateRequest<Body> for TargetValidator {
   type ResponseBody = Body;
 
   fn validate(
@@ -153,7 +153,7 @@ impl Server {
                 Some(Self::content_security_policy(self.address, request))
               },
             ))
-            .layer(ValidateRequestHeaderLayer::custom(Validator(
+            .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
               library.clone(),
             )))
             .layer(Extension(library))
@@ -399,7 +399,7 @@ mod tests {
 
     let library = Arc::new(library);
 
-    let mut validator = Validator(library);
+    let mut validator = TargetValidator(library);
 
     let mut request = http::Request::builder()
       .method("GET")
