@@ -19,7 +19,7 @@ use {
 pub struct Server {
   #[arg(long, help = "Listen on <ADDRESS> for incoming requests.")]
   address: SocketAddr,
-  #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>")]
+  #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>", num_args = 1..)]
   packages: Vec<Utf8PathBuf>,
   #[arg(long, help = "Open server in browser.")]
   open: bool,

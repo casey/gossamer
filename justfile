@@ -28,5 +28,4 @@ serve:
   ./target/debug/media server \
     --open \
     --address 127.0.0.1:8000 \
-    --app tmp/app.package \
-    --content tmp/content.package
+    --packages tmp/app.package tmp/content.package tmp/library.package
