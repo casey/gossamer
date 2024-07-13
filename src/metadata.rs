@@ -79,7 +79,7 @@ impl Media {
   pub fn ty(&self) -> Type {
     match self {
       Self::App { .. } => Type::App,
-      Self::Comic { .. } => Type::Comic,
+      Self::Comic => Type::Comic,
     }
   }
 }

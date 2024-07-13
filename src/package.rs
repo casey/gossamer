@@ -251,7 +251,7 @@ impl Package {
         mime_guess::from_path(path).first_or_octet_stream(),
         self.files.get(paths.get(path)?).unwrap().clone(),
       )),
-      Media::Comic { pages, .. } => {
+      Media::Comic { pages } => {
         if path.len() > 1 && path.starts_with('0') {
           return None;
         }
@@ -278,7 +278,7 @@ impl Package {
 
     let expected: HashSet<Hash> = match &manifest.media {
       Media::App { paths, .. } => paths.values().copied().collect(),
-      Media::Comic { pages, .. } => pages.iter().copied().collect(),
+      Media::Comic { pages } => pages.iter().copied().collect(),
     };
 
     for hash in &expected {
