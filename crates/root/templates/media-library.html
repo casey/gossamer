@@ -1,27 +1,40 @@
 <!doctype html>
 <html>
   <head>
+    <link rel=stylesheet href=app/modern-normalize.css>
     <style>
+      body {
+        display: grid;
+        grid-template-columns: 1fr 3fr;
+        height: 100%;
+      }
+
+      html {
+        height: 100%;
+      }
+
+      iframe {
+        height: 100%;
+        width: 100%;
+      }
     </style>
   </head>
   <body>
-    <ul>
+    <nav>
+      <ul>
 %% for (hash, manifest) in &self.packages {
 %%   let ty = manifest.ty();
-      <li>
-        <dl>
-          <dt>hash</dt><dd>{{hash}}</dd>
-          <dt>type</dt><dd>{{ty}}</dd>
+        <li>
+          {{ty}}
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
-          <dt>open</dt>
-          <dd>
-            <button data-handler={{handler}} data-package={{hash}}>open</button>
-          </dd>
+          <button data-handler={{handler}} data-package={{hash}}>open</button>
 %%   }
-        </dl>
-      </li>
+        </li>
 %% }
-    </ul>
-    <iframe></iframe>
+      </ul>
+    </nav>
+    <main>
+      <iframe></iframe>
+    </main>
   </body>
 </html>
