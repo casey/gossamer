@@ -13,13 +13,16 @@ impl Component for App {
     "media-app"
   }
 
-  async fn initialize() -> Result<Self, JsValue> {
+  async fn initialize() -> Result<Self, Error> {
     let api = Api::default();
 
     let manifest = api.manifest().await?;
 
     let Media::App { target, paths } = manifest.media else {
-      panic!()
+      return Err(Error::ContentType {
+        content: manifest.ty(),
+        target: Target::App,
+      });
     };
 
     Ok(Self {

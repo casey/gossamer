@@ -7,6 +7,7 @@ export function define(name, callback) {
         shadow.appendChild(root.documentElement);
         connected(shadow);
       } catch (error) {
+        shadow.appendChild(error.documentElement);
         console.log(error);
       }
     }

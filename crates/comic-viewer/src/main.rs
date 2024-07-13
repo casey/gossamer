@@ -4,10 +4,10 @@ use {
     boilerplate::Boilerplate,
     html_escaper::Escape,
     log,
+    media::{Media, Target},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    wasm_bindgen_futures, Api, Component,
+    wasm_bindgen_futures, Api, Component, Error,
   },
-  media::Media,
 };
 
 mod comic;

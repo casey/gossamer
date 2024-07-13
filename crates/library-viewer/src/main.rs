@@ -4,12 +4,12 @@ use {
     boilerplate::Boilerplate,
     html_escaper::Escape,
     log,
+    media::{Hash, Manifest, Target, Type},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
     wasm_bindgen_futures,
     web_sys::{self, HtmlButtonElement, HtmlIFrameElement, PointerEvent, ShadowRoot},
-    Api, Component, EventTargetExt, Select,
+    Api, Component, Error, EventTargetExt, Select,
   },
-  media::{Hash, Manifest, Target, Type},
   std::{collections::BTreeMap, sync::Arc},
 };
 

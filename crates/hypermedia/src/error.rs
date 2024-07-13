@@ -7,6 +7,19 @@ pub enum Error {
     #[snafu(source(false))]
     source: log::SetLoggerError,
   },
+  #[snafu(display("deserializing response from {url} failed"))]
+  Deserialize {
+    url: Url,
+    source: ciborium::de::Error<io::Error>,
+  },
+  #[snafu(display("request to {url} failed"))]
+  Request { url: Url, source: reqwest::Error },
+  #[snafu(display("response from {url} failed with {status}"))]
+  Status { url: Url, status: StatusCode },
+  #[snafu(display(
+    "content package of type `{content}` cannot be opened by app with target `{target}`"
+  ))]
+  ContentType { content: Type, target: Target },
 }
 
 impl From<Error> for JsValue {

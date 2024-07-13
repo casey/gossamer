@@ -1,9 +1,11 @@
 #![allow(async_fn_in_trait)]
 
 use {
-  self::error::Error,
+  self::dialog::Dialog,
+  boilerplate::Boilerplate,
+  html_escaper::Escape,
   js_sys::{Array, Promise},
-  media::{Hash, Manifest, Target},
+  media::{Hash, Manifest, Target, Type},
   reqwest::{StatusCode, Url},
   serde::de::DeserializeOwned,
   snafu::{ensure, ResultExt, Snafu},
@@ -20,14 +22,16 @@ use {
 
 pub use {
   self::{
-    api::Api, cast::Cast, component::Component, event_target_ext::EventTargetExt, select::Select,
+    api::Api, cast::Cast, component::Component, error::Error, event_target_ext::EventTargetExt,
+    select::Select,
   },
-  boilerplate, html_escaper, js_sys, log, wasm_bindgen, wasm_bindgen_futures, web_sys,
+  boilerplate, html_escaper, js_sys, log, media, wasm_bindgen, wasm_bindgen_futures, web_sys,
 };
 
 mod api;
 mod cast;
 mod component;
+mod dialog;
 mod error;
 mod event_target_ext;
 mod js;

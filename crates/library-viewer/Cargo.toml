@@ -5,7 +5,6 @@ edition = "2021"
 publish = false
 
 [dependencies]
-media = { path = "../media" }
 hypermedia = { path = "../hypermedia" }
 
 [dependencies.web-sys]

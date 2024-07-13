@@ -1,25 +1,5 @@
 use super::*;
 
-#[derive(Debug, Snafu)]
-#[snafu(context(suffix(false)))]
-pub enum Error {
-  #[snafu(display("deserializing response from {url} failed"))]
-  Deserialize {
-    url: Url,
-    source: ciborium::de::Error<io::Error>,
-  },
-  #[snafu(display("request to {url} failed"))]
-  Request { url: Url, source: reqwest::Error },
-  #[snafu(display("response from {url} failed with {status}"))]
-  Status { url: Url, status: StatusCode },
-}
-
-impl From<Error> for JsValue {
-  fn from(error: Error) -> Self {
-    js_sys::Error::new(&error.to_string()).into()
-  }
-}
-
 pub struct Api {
   base: Url,
 }
@@ -54,13 +34,13 @@ impl Api {
       .get(url.clone())
       .send()
       .await
-      .with_context(|_| Request { url: url.clone() })?;
+      .with_context(|_| error::Request { url: url.clone() })?;
 
     let status = response.status();
 
     ensure!(
       status.is_success(),
-      Status {
+      error::Status {
         status,
         url: url.clone()
       }
@@ -69,8 +49,9 @@ impl Api {
     let body = response
       .bytes()
       .await
-      .with_context(|_| Request { url: url.clone() })?;
+      .with_context(|_| error::Request { url: url.clone() })?;
 
-    ciborium::from_reader(Cursor::new(body)).with_context(|_| Deserialize { url: url.clone() })
+    ciborium::from_reader(Cursor::new(body))
+      .with_context(|_| error::Deserialize { url: url.clone() })
   }
 }

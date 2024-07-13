@@ -4,10 +4,10 @@ use {
     boilerplate::Boilerplate,
     html_escaper::Escape,
     log,
+    media::{Hash, Media, Target},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    wasm_bindgen_futures, Api, Component,
+    wasm_bindgen_futures, Api, Component, Error,
   },
-  media::{Hash, Media, Target},
   std::collections::BTreeMap,
 };
 

@@ -80,7 +80,6 @@ name = "app-viewer"
 version = "0.0.0"
 dependencies = [
  "hypermedia",
- "media",
 ]
 
 [[package]]
@@ -361,7 +360,6 @@ name = "comic-viewer"
 version = "0.0.0"
 dependencies = [
  "hypermedia",
- "media",
 ]
 
 [[package]]
@@ -872,7 +870,6 @@ name = "library-viewer"
 version = "0.0.0"
 dependencies = [
  "hypermedia",
- "media",
  "web-sys",
 ]
 
