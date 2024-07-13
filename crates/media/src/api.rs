@@ -35,6 +35,10 @@ impl Default for Api {
 }
 
 impl Api {
+  pub async fn manifest(&self) -> Result<Manifest, Error> {
+    self.get("api/manifest").await
+  }
+
   pub async fn packages(&self) -> Result<BTreeMap<Hash, Manifest>, Error> {
     self.get("api/packages").await
   }

@@ -221,11 +221,8 @@ impl Server {
   async fn manifest(
     library: Extension<Arc<Library>>,
     Path((_app, content)): HashRoot,
-  ) -> ServerResult {
-    Ok(Resource::new(
-      mime::APPLICATION_JSON,
-      serde_json::to_vec(&Self::package(&library, content.0)?.manifest).unwrap(),
-    ))
+  ) -> ServerResult<Cbor<Manifest>> {
+    Ok(Cbor(Self::package(&library, content.0)?.manifest.clone()))
   }
 
   async fn app(
@@ -340,12 +337,7 @@ mod tests {
     )
     .await
     .unwrap();
-    assert_eq!(manifest.content_type, mime::APPLICATION_JSON);
-    assert!(
-      manifest.content.starts_with(b"{\"name\":\"test-comic\""),
-      "{}",
-      String::from_utf8(manifest.content).unwrap()
-    );
+    assert_eq!(manifest.0, PACKAGES.comic().manifest);
 
     let index_js = Server::app(library.clone(), hash_path(app, comic, "index.js".into()))
       .await

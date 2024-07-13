@@ -1,4 +1,3 @@
-/crates/library/build
-/crates/library/library.package
+/build
 /target
 /tmp

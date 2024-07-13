@@ -1,13 +1,13 @@
 use super::*;
 
 #[derive(Boilerplate)]
-#[boilerplate(filename = "media-library.html")]
-pub struct MediaLibrary {
+#[boilerplate(filename = "library.html")]
+pub struct Library {
   pub packages: BTreeMap<Hash, Manifest>,
   pub handlers: BTreeMap<Target, Hash>,
 }
 
-impl Component for MediaLibrary {
+impl Component for Library {
   fn name() -> &'static str {
     "media-library"
   }

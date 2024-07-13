@@ -1,4 +1,4 @@
-#[allow(unused)]
+#[macro_export]
 macro_rules! debug {
   () => {
     log::debug!("[{}:{}]", file!(), line!());

@@ -1,0 +1,5 @@
+name: comic
+
+media:
+  type: app
+  target: comic
