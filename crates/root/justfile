@@ -14,7 +14,7 @@ package:
     --out-dir build
   mv build/index_bg.wasm build/index.wasm
   mv build/index.js build/loader.js
-  rsync -avz files/ build/
+  rsync -avz --exclude .DS_Store files/ build/
   cargo build --package gossamer
   ../../target/debug/gossamer package --root build --output root.package
 

@@ -260,7 +260,7 @@ mod tests {
   fn package_load_error() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("app.package");
+    let package = tempdir.join("app.package");
 
     assert_matches!(
       Server {

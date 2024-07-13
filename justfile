@@ -28,6 +28,12 @@ forbid:
 build:
   cargo build
 
+clean:
+  cargo clean
+  rm -rf tmp
+  rm -rf crates/root/build
+  rm -rf crates/root/root.package
+
 serve: build
   rm -rf tmp
   mkdir tmp
@@ -42,9 +48,10 @@ serve: build
 apps:
   just root package
   cargo build
-  target/debug/gossamer package --root tests/packages/app-comic --output tmp/app.package
-  target/debug/gossamer package --root tests/packages/comic --output tmp/comic.package
+  mkdir -p target/packages
+  target/debug/gossamer package --root tests/packages/app-comic --output target/packages/app.package
+  target/debug/gossamer package --root tests/packages/comic --output target/packages/comic.package
   target/debug/gossamer server \
     --open \
     --address 127.0.0.1:8000 \
-    --packages crates/root/root.package tmp/app.package tmp/comic.package
+    --packages crates/root/root.package target/packages/app.package target/packages/comic.package
