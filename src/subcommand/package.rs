@@ -271,11 +271,7 @@ mod tests {
 
     assert_eq!(package.files.len(), 3);
 
-    let manifest_bytes = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&package.manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest_bytes = package.manifest.to_cbor();
 
     let manifest = Hash::bytes(&manifest_bytes);
 
@@ -365,11 +361,7 @@ mod tests {
 
     assert_eq!(package.files.len(), 3);
 
-    let manifest_bytes = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&package.manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest_bytes = package.manifest.to_cbor();
 
     let manifest = Hash::bytes(&manifest_bytes);
 

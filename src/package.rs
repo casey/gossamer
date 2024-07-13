@@ -205,11 +205,7 @@ impl Package {
 
     let mut hashes = hashes.values().copied().collect::<Vec<(Hash, u64)>>();
 
-    let manifest = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest = manifest.to_cbor();
 
     let manifest_hash = Hash::bytes(&manifest);
 
@@ -524,11 +520,7 @@ mod tests {
       },
     };
 
-    let manifest_bytes = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest_bytes = manifest.to_cbor();
 
     let hash = Hash::bytes(&manifest_bytes);
 
