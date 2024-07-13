@@ -1,0 +1,5 @@
+name: Comic Viewer
+
+media:
+  type: app
+  target: comic
