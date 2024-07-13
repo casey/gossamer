@@ -2,13 +2,13 @@ use super::*;
 
 #[derive(Default)]
 pub struct Library {
-  packages: HashMap<Hash, Package>,
-  handlers: HashMap<Target, Hash>,
+  packages: BTreeMap<Hash, Package>,
+  handlers: BTreeMap<Target, Hash>,
 }
 
 impl Library {
   pub fn add(&mut self, package: Package) {
-    if let Manifest::App { target, .. } = &package.manifest {
+    if let Media::App { target, .. } = &package.manifest.media {
       self.handlers.insert(*target, package.hash);
     }
 
@@ -19,11 +19,19 @@ impl Library {
     self.packages.get(&hash)
   }
 
+  pub fn packages(&self) -> &BTreeMap<Hash, Package> {
+    &self.packages
+  }
+
   pub fn handler(&self, target: Target) -> Option<&Package> {
     self
       .handlers
       .get(&target)
       .map(|hash| self.packages.get(hash).unwrap())
+  }
+
+  pub fn handlers(&self) -> &BTreeMap<Target, Hash> {
+    &self.handlers
   }
 }
 

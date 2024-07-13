@@ -3,8 +3,8 @@
 use {
   self::{
     deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, library::Library,
-    manifest::Manifest, metadata::Metadata, package::Package, path_ext::PathExt, read_ext::ReadExt,
-    subcommand::Subcommand, target::Target, template::Template, ty::Type, write_ext::WriteExt,
+    metadata::Metadata, package::Package, path_ext::PathExt, read_ext::ReadExt,
+    subcommand::Subcommand, template::Template, write_ext::WriteExt,
   },
   axum::{
     body::Body,
@@ -14,10 +14,10 @@ use {
       Uri,
     },
   },
-  blake3::{Hash, Hasher},
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
   libc::EXIT_FAILURE,
+  media::{Cbor, Hash, Manifest, Media, Target, Type},
   mime_guess::{mime, Mime},
   regex::Regex,
   regex_static::{lazy_regex, once_cell::sync::Lazy},
@@ -26,7 +26,7 @@ use {
   std::{
     backtrace::{Backtrace, BacktraceStatus},
     collections::{BTreeMap, HashMap, HashSet},
-    fmt::{self, Display, Formatter},
+    fmt::Display,
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
     net::SocketAddr,
@@ -50,15 +50,12 @@ mod deserialize_from_str;
 mod error;
 mod into_u64;
 mod library;
-mod manifest;
 mod metadata;
 mod package;
 mod path_ext;
 mod read_ext;
 mod subcommand;
-mod target;
 mod template;
-mod ty;
 mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;

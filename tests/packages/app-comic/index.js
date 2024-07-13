@@ -5,12 +5,12 @@ class App {
   constructor() {
     let html = '';
 
-    if (manifest.type != "comic") {
+    if (manifest.media.type != "comic") {
       document.body.innerHTML = `<h1>app cannot handle content type \`${manifest.type}\``;
       return;
     }
 
-    for (let i = 0; i < manifest.pages.length; i++) {
+    for (let i = 0; i < manifest.media.pages.length; i++) {
       if (i > 0) {
         html += '\n';
       }

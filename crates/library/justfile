@@ -1,0 +1,24 @@
+set fallback
+
+package:
+  rm -rf build
+  mkdir build
+  cargo build \
+    --package library \
+    --target wasm32-unknown-unknown
+  cp ../../target/wasm32-unknown-unknown/debug/library.wasm build/index.wasm
+  wasm-bindgen \
+    --target web \
+    --no-typescript \
+    build/index.wasm \
+    --out-dir build
+  mv build/index_bg.wasm build/index.wasm
+  mv build/index.js build/loader.js
+  rsync -avz --exclude .DS_Store files/ build/
+  cargo build --package gossamer
+  ../../target/debug/gossamer package --root build --output library.package
+
+update-modern-normalize:
+  curl \
+    https://raw.githubusercontent.com/sindresorhus/modern-normalize/main/modern-normalize.css \
+    > files/modern-normalize.css

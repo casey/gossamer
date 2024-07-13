@@ -8,11 +8,31 @@ pub fn tempdir() -> TempDir {
 
 pub trait TempDirExt {
   fn path_utf8(&self) -> &Utf8Path;
+
+  fn touch(&self, path: impl AsRef<Utf8Path>) {
+    self.write(path, []);
+  }
+
+  fn write(&self, path: impl AsRef<Utf8Path>, data: impl AsRef<[u8]>);
+
+  fn write_yaml(&self, path: impl AsRef<Utf8Path>, value: impl Serialize) {
+    self.write(path, serde_yaml::to_string(&value).unwrap());
+  }
+
+  fn join(&self, path: impl AsRef<Utf8Path>) -> Utf8PathBuf {
+    self.path_utf8().join(path)
+  }
 }
 
 impl TempDirExt for TempDir {
   fn path_utf8(&self) -> &Utf8Path {
     self.path().try_into().unwrap()
+  }
+
+  fn write(&self, path: impl AsRef<Utf8Path>, data: impl AsRef<[u8]>) {
+    let path = self.path_utf8().join(path);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, data).unwrap();
   }
 }
 
@@ -32,30 +52,28 @@ macro_rules! assert_matches {
 pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
   let dir = tempdir();
 
-  let path = dir.path_utf8();
+  let app = dir.join("app.package");
 
-  let app = path.join("app.package");
+  let root = dir.join("root.package");
 
-  let library = path.join("library.package");
-
-  let comic = path.join("comic.package");
+  let comic = dir.join("comic.package");
 
   subcommand::package::Package {
-    root: "apps/comic".into(),
+    root: "tests/packages/app-comic".into(),
     output: app.clone(),
   }
   .run()
   .unwrap();
 
   subcommand::package::Package {
-    root: "apps/library".into(),
-    output: library.clone(),
+    root: "tests/packages/app-root".into(),
+    output: root.clone(),
   }
   .run()
   .unwrap();
 
   subcommand::package::Package {
-    root: "content/comic".into(),
+    root: "tests/packages/comic".into(),
     output: comic.clone(),
   }
   .run()
@@ -64,13 +82,13 @@ pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
   Packages {
     dir,
     app: Package::load(&app).unwrap(),
-    library: Package::load(&library).unwrap(),
+    root: Package::load(&root).unwrap(),
     comic: Package::load(&comic).unwrap(),
   }
 });
 
 pub struct Packages {
-  library: Package,
+  root: Package,
   app: Package,
   comic: Package,
   #[allow(unused)]
@@ -82,8 +100,8 @@ impl Packages {
     &self.app
   }
 
-  pub fn library(&self) -> &Package {
-    &self.library
+  pub fn root(&self) -> &Package {
+    &self.root
   }
 
   pub fn comic(&self) -> &Package {

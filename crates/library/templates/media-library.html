@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset=utf-8>
+    <link rel=stylesheet href=app/modern-normalize.css>
+    <style>
+      body {
+        display: grid;
+        grid-template-columns: 1fr 3fr;
+        height: 100%;
+      }
+
+      html {
+        height: 100%;
+      }
+
+      iframe {
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <ul>
+%% for (hash, manifest) in &self.packages {
+%%   let ty = manifest.media.ty();
+        <li>
+          {{ manifest.name }}
+%%   if let Some(handler) = self.handlers.get(&ty.into()) {
+          <button data-handler={{handler}} data-package={{hash}}>open</button>
+%%   }
+        </li>
+%% }
+      </ul>
+    </nav>
+    <main>
+      <iframe></iframe>
+    </main>
+  </body>
+</html>

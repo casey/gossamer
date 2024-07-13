@@ -1,0 +1,5 @@
+name: app-root
+
+media:
+  type: app
+  target: root

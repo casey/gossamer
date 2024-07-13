@@ -60,13 +60,10 @@ impl Package {
 
       let len = file.metadata().context(context)?.len();
 
-      let mut hasher = Hasher::new();
-
-      hasher.update_reader(file).context(context)?;
-
-      let hash = hasher.finalize();
-
-      hashes.insert(relative.clone(), (hash, len));
+      hashes.insert(
+        relative.clone(),
+        (Hash::reader(file).context(context)?, len),
+      );
     }
 
     Ok(hashes)
@@ -106,14 +103,12 @@ mod tests {
 
   #[test]
   fn package() {
-    for root in ["apps/comic", "content/comic"] {
+    for root in ["tests/packages/app-comic", "tests/packages/comic"] {
       let tempdir = tempdir();
 
       let result = Package {
         root: root.into(),
-        output: Utf8Path::from_path(tempdir.path())
-          .unwrap()
-          .join("output.package"),
+        output: tempdir.join("output.package"),
       }
       .run();
 
@@ -146,7 +141,7 @@ mod tests {
   fn output_is_dir_error() {
     let tempdir = tempdir();
 
-    let output_dir = tempdir.path_utf8().join("foo");
+    let output_dir = tempdir.join("foo");
 
     fs::create_dir(&output_dir).unwrap();
 
@@ -169,8 +164,8 @@ mod tests {
   fn metadata_missing_error() {
     let tempdir = tempdir();
 
-    let root_dir = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root_dir = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
     fs::create_dir(&root_dir).unwrap();
 
@@ -193,17 +188,22 @@ mod tests {
   fn app_requires_index_html() {
     let tempdir = tempdir();
 
-    let root_dir = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "app-comic".into(),
+        media: metadata::Media::App {
+          target: Target::Comic,
+        },
+      },
+    );
 
-    fs::create_dir(&root_dir).unwrap();
-
-    fs::write(root_dir.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
+    let root_dir = tempdir.join("root");
 
     assert_matches!(
       Package {
         root: root_dir.clone(),
-        output,
+        output: tempdir.join("output.package"),
       }
       .run()
       .unwrap_err(),
@@ -234,14 +234,21 @@ mod tests {
   fn app_package_includes_all_files() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "app-comic".into(),
+        media: metadata::Media::App {
+          target: Target::Comic,
+        },
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
-    fs::write(root.join("index.html"), "foo").unwrap();
-    fs::write(root.join("index.js"), "bar").unwrap();
+    tempdir.write("root/index.html", "foo");
+    tempdir.write("root/index.js", "bar");
 
     Package {
       root: root.clone(),
@@ -254,22 +261,18 @@ mod tests {
 
     assert_eq!(package.files.len(), 3);
 
-    let manifest_bytes = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&package.manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest_bytes = package.manifest.to_cbor();
 
-    let manifest = blake3::hash(&manifest_bytes);
+    let manifest = Hash::bytes(&manifest_bytes);
 
-    let Manifest::App { target, paths } = package.manifest else {
+    let Media::App { target, paths } = package.manifest.media else {
       panic!("unexpected manifest type");
     };
 
     assert_eq!(target, Target::Comic);
 
-    let foo = blake3::hash("foo".as_bytes());
-    let bar = blake3::hash("bar".as_bytes());
+    let foo = Hash::bytes("foo".as_bytes());
+    let bar = Hash::bytes("bar".as_bytes());
 
     assert_eq!(paths.len(), 2);
     assert_eq!(paths["index.html"], foo);
@@ -281,17 +284,54 @@ mod tests {
   }
 
   #[test]
+  fn files_are_deduplicated() {
+    let tempdir = tempdir();
+
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
+
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "app-comic".into(),
+        media: metadata::Media::App {
+          target: Target::Comic,
+        },
+      },
+    );
+
+    tempdir.write("root/index.html", "foo");
+    tempdir.write("root/index.js", "foo");
+
+    Package {
+      root: root.clone(),
+      output: output.clone(),
+    }
+    .run()
+    .unwrap_or_display();
+
+    let package = super::super::Package::load(&output).unwrap_or_display();
+
+    assert_eq!(package.files.len(), 2);
+  }
+
+  #[test]
   fn comic_package_includes_all_pages() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("0.jpg"), "foo").unwrap();
-    fs::write(root.join("1.jpg"), "bar").unwrap();
+    tempdir.write("root/0.jpg", "foo");
+    tempdir.write("root/1.jpg", "bar");
 
     Package {
       root,
@@ -304,20 +344,16 @@ mod tests {
 
     assert_eq!(package.files.len(), 3);
 
-    let manifest_bytes = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&package.manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest_bytes = package.manifest.to_cbor();
 
-    let manifest = blake3::hash(&manifest_bytes);
+    let manifest = Hash::bytes(&manifest_bytes);
 
-    let Manifest::Comic { pages } = package.manifest else {
+    let Media::Comic { pages } = package.manifest.media else {
       panic!("unexpected manifest type");
     };
 
-    let foo = blake3::hash("foo".as_bytes());
-    let bar = blake3::hash("bar".as_bytes());
+    let foo = Hash::bytes("foo".as_bytes());
+    let bar = Hash::bytes("bar".as_bytes());
 
     assert_eq!(pages.len(), 2);
     assert_eq!(pages[0], foo);
@@ -332,13 +368,19 @@ mod tests {
   fn directories_are_ignored() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("0.jpg"), "").unwrap();
+    tempdir.touch("root/0.jpg");
+
     fs::create_dir(root.join("bar")).unwrap();
 
     Package { root, output }.run().unwrap();
@@ -348,14 +390,19 @@ mod tests {
   fn ds_store_files_are_ignored() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("0.jpg"), "").unwrap();
-    fs::write(root.join(".DS_Store"), "").unwrap();
+    tempdir.touch("root/0.jpg");
+    tempdir.touch("root/.DS_Store");
 
     Package { root, output }.run().unwrap();
   }
@@ -364,12 +411,16 @@ mod tests {
   fn comic_must_have_pages() {
     let tempdir = tempdir();
 
-    let root_dir = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root_dir = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root_dir).unwrap();
-
-    fs::write(root_dir.join("metadata.yaml"), "type: comic").unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
     assert_matches!(
       Package {
@@ -390,13 +441,18 @@ mod tests {
   fn comic_page_missing_error() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("1.jpg"), "").unwrap();
+    tempdir.touch("root/1.jpg");
 
     assert_matches!(
       Package {
@@ -420,11 +476,16 @@ mod tests {
     let root = tempdir.path_utf8().join("root");
     let output = tempdir.path_utf8().join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("0.jpg"), "").unwrap();
-    fs::write(root.join("00.jpg"), "").unwrap();
+    tempdir.touch("root/0.jpg");
+    tempdir.touch("root/00.jpg");
 
     assert_matches!(
       Package {
@@ -445,14 +506,19 @@ mod tests {
   fn comic_unexpected_file() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join("0.jpg"), "").unwrap();
-    fs::write(root.join("foo.jpg"), "").unwrap();
+    tempdir.touch("root/0.jpg");
+    tempdir.touch("root/foo.jpg");
 
     assert_matches!(
       Package {
@@ -474,13 +540,18 @@ mod tests {
   fn comic_invalid_page() {
     let tempdir = tempdir();
 
-    let root = tempdir.path_utf8().join("root");
-    let output = tempdir.path_utf8().join("output.package");
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
 
-    fs::create_dir(&root).unwrap();
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      },
+    );
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
-    fs::write(root.join(format!("{}.jpg", u128::from(u64::MAX) + 1)), "").unwrap();
+    tempdir.touch(format!("root/{}.jpg", u128::from(u64::MAX) + 1));
 
     assert_matches!(
       Package {

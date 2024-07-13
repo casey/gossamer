@@ -1,10 +1,10 @@
 use super::*;
 
-#[derive(Copy, Clone, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "type")]
-pub enum Metadata {
-  App { target: Target },
-  Comic,
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub struct Metadata {
+  pub name: String,
+  pub media: Media,
 }
 
 impl Metadata {
@@ -16,15 +16,15 @@ impl Metadata {
   }
 
   pub fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
-    match self {
-      Self::App { target } => {
+    let media = match &self.media {
+      Media::App { target } => {
         ensure!(
           paths.contains(Utf8Path::new("index.html")),
           error::Index { root }
         );
-        Ok(Template::App { target })
+        template::Media::App { target: *target }
       }
-      Self::Comic => {
+      Media::Comic => {
         let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();
 
         let page_re = Regex::new(r"^(\d+)\.jpg$").unwrap();
@@ -34,7 +34,7 @@ impl Metadata {
             .captures(path.as_ref())
             .context(error::UnexpectedFile {
               file: path.clone(),
-              ty: self.ty(),
+              ty: self.media.ty(),
             })?;
 
           pages.push((
@@ -55,14 +55,28 @@ impl Metadata {
           ensure!(i <= page, error::PageDuplicated { page });
         }
 
-        Ok(Template::Comic {
+        template::Media::Comic {
           pages: pages.into_iter().map(|(_page, path)| path).collect(),
-        })
+        }
       }
-    }
-  }
+    };
 
-  pub fn ty(self) -> Type {
+    Ok(Template {
+      media,
+      name: self.name.clone(),
+    })
+  }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "type")]
+pub enum Media {
+  App { target: Target },
+  Comic,
+}
+
+impl Media {
+  pub fn ty(&self) -> Type {
     match self {
       Self::App { .. } => Type::App,
       Self::Comic => Type::Comic,

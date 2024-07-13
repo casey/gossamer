@@ -1,28 +1,38 @@
 use super::*;
 
-pub enum Template {
+pub struct Template {
+  pub name: String,
+  pub media: Media,
+}
+
+pub enum Media {
   App { target: Target },
   Comic { pages: Vec<Utf8PathBuf> },
 }
 
 impl Template {
   pub fn manifest(self, hashes: &HashMap<Utf8PathBuf, (Hash, u64)>) -> Manifest {
-    match self {
-      Self::App { target } => {
+    let media = match self.media {
+      Media::App { target } => {
         let mut paths = BTreeMap::new();
 
         for (path, (hash, _len)) in hashes {
           paths.insert(path.to_string(), *hash);
         }
 
-        Manifest::App { target, paths }
+        super::Media::App { target, paths }
       }
-      Self::Comic { pages } => Manifest::Comic {
+      Media::Comic { pages } => super::Media::Comic {
         pages: pages
           .into_iter()
           .map(|path| hashes.get(&path).unwrap().0)
           .collect(),
       },
+    };
+
+    Manifest {
+      name: self.name,
+      media,
     }
   }
 }

@@ -92,7 +92,7 @@ pub struct Package {
 }
 
 impl Package {
-  pub const MAGIC_BYTES: &'static str = "MEDIA📦\0";
+  pub const MAGIC_BYTES: &'static str = "MEDIA📦\r\n\x1a\n\0";
 
   pub fn load(path: &Utf8Path) -> Result<Self, Error> {
     let file = File::open(path)?;
@@ -160,7 +160,7 @@ impl Package {
 
       package.read_exact(&mut buffer)?;
 
-      let actual = blake3::hash(&buffer);
+      let actual = Hash::bytes(&buffer);
 
       ensure!(actual == expected, FileHashInvalid { expected, actual });
 
@@ -179,7 +179,7 @@ impl Package {
     let manifest: Manifest =
       ciborium::from_reader(Cursor::new(files.get(&hash).unwrap())).context(DeserializeManifest)?;
 
-    manifest.verify(hash, &files)?;
+    Self::verify(&files, &manifest, hash)?;
 
     Ok(Self {
       manifest,
@@ -205,17 +205,15 @@ impl Package {
 
     let mut hashes = hashes.values().copied().collect::<Vec<(Hash, u64)>>();
 
-    let manifest = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest = manifest.to_cbor();
 
-    let manifest_hash = blake3::hash(&manifest);
+    let manifest_hash = Hash::bytes(&manifest);
 
     hashes.push((manifest_hash, manifest.len().into_u64()));
 
     hashes.sort_by_key(|hash| *hash.0.as_bytes());
+
+    hashes.dedup();
 
     let index = hashes
       .iter()
@@ -248,12 +246,12 @@ impl Package {
   }
 
   pub fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
-    match &self.manifest {
-      Manifest::App { paths, .. } => Some((
+    match &self.manifest.media {
+      Media::App { paths, .. } => Some((
         mime_guess::from_path(path).first_or_octet_stream(),
         self.files.get(paths.get(path)?).unwrap().clone(),
       )),
-      Manifest::Comic { pages } => {
+      Media::Comic { pages } => {
         if path.len() > 1 && path.starts_with('0') {
           return None;
         }
@@ -268,6 +266,38 @@ impl Package {
         ))
       }
     }
+  }
+
+  pub fn verify(
+    files: &HashMap<Hash, Vec<u8>>,
+    manifest: &Manifest,
+    manifest_hash: Hash,
+  ) -> Result<(), package::Error> {
+    let mut extra = 0u64;
+    let mut missing = 0u64;
+
+    let expected: HashSet<Hash> = match &manifest.media {
+      Media::App { paths, .. } => paths.values().copied().collect(),
+      Media::Comic { pages } => pages.iter().copied().collect(),
+    };
+
+    for hash in &expected {
+      if !files.contains_key(hash) {
+        missing += 1;
+      }
+    }
+
+    ensure!(missing == 0, package::ManifestMissingFiles { missing });
+
+    for hash in files.keys() {
+      if *hash != manifest_hash && !expected.contains(hash) {
+        extra += 1;
+      }
+    }
+
+    ensure!(extra == 0, package::ManifestExtraFiles { extra });
+
+    Ok(())
   }
 }
 
@@ -286,7 +316,7 @@ mod tests {
     assert_matches!(
       Package::load(&package).unwrap_err(),
       Error::MagicBytes { bytes, .. }
-      if bytes == *b"this-is-no"
+      if bytes == *b"this-is-not-a-"
     );
   }
 
@@ -394,7 +424,7 @@ mod tests {
     assert_matches!(
       Package::load(&package).unwrap_err(),
       Error::FileHashInvalid { actual, expected, .. }
-      if actual == blake3::hash(&[]) && expected.as_bytes() == &[0; 32],
+      if actual == Hash::bytes(&[]) && expected.as_bytes() == &[0; 32],
     );
   }
 
@@ -402,7 +432,7 @@ mod tests {
   fn file_truncated() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("package.package");
+    let package = tempdir.join("package.package");
 
     let mut bytes = Vec::new();
 
@@ -425,14 +455,14 @@ mod tests {
   fn trailing_bytes() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("package.package");
+    let package = tempdir.join("package.package");
 
     let mut bytes = Vec::new();
 
     bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
     bytes.extend_from_slice(&1u64.to_le_bytes());
-    bytes.extend_from_slice(blake3::hash(&[]).as_bytes());
+    bytes.extend_from_slice(Hash::bytes(&[]).as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
     bytes.extend_from_slice(&[0]);
 
@@ -448,14 +478,14 @@ mod tests {
   fn manifest_deserialize_error() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("package.package");
+    let package = tempdir.join("package.package");
 
     let mut bytes = Vec::new();
 
     bytes.extend_from_slice(Package::MAGIC_BYTES.as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
     bytes.extend_from_slice(&1u64.to_le_bytes());
-    bytes.extend_from_slice(blake3::hash(&[]).as_bytes());
+    bytes.extend_from_slice(Hash::bytes(&[]).as_bytes());
     bytes.extend_from_slice(&0u64.to_le_bytes());
 
     fs::write(&package, bytes).unwrap();
@@ -470,31 +500,29 @@ mod tests {
   fn save_and_load() {
     let tempdir = tempdir();
 
-    let output = tempdir.path_utf8().join("package.package");
+    let output = tempdir.join("package.package");
 
-    let root = tempdir.path_utf8().join("root");
+    let root = tempdir.join("root");
 
-    fs::create_dir(&root).unwrap();
-    fs::write(root.join("index.html"), "html").unwrap();
-    fs::write(root.join("index.js"), "js").unwrap();
+    tempdir.write("root/index.html", "html");
+    tempdir.write("root/index.js", "js");
 
-    let html = blake3::hash(b"html");
-    let js = blake3::hash(b"js");
+    let html = Hash::bytes(b"html");
+    let js = Hash::bytes(b"js");
 
-    let manifest = Manifest::App {
-      target: Target::Comic,
-      paths: vec![("index.html".into(), html), ("index.js".into(), js)]
-        .into_iter()
-        .collect(),
+    let manifest = Manifest {
+      name: "app-comic".into(),
+      media: Media::App {
+        target: Target::Comic,
+        paths: vec![("index.html".into(), html), ("index.js".into(), js)]
+          .into_iter()
+          .collect(),
+      },
     };
 
-    let manifest_bytes = {
-      let mut buffer = Vec::new();
-      ciborium::into_writer(&manifest, &mut buffer).unwrap();
-      buffer
-    };
+    let manifest_bytes = manifest.to_cbor();
 
-    let hash = blake3::hash(&manifest_bytes);
+    let hash = Hash::bytes(&manifest_bytes);
 
     let hashes = vec![
       ("index.html".into(), (html, 4)),

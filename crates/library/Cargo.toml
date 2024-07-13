@@ -1,0 +1,34 @@
+[package]
+name = "library"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+boilerplate = "1.0.0"
+console_error_panic_hook = "0.1.7"
+console_log = "1.0.0"
+html-escaper = "0.2.0"
+js-sys = "0.3.69"
+log = "0.4.22"
+media = { path = "../media" }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4.42"
+
+[dependencies.web-sys]
+version = "0.3.69"
+features = [
+  "CustomElementRegistry",
+  "Document",
+  "DomParser",
+  "DomStringMap",
+  "Element",
+  "PointerEvent",
+  "HtmlBodyElement",
+  "HtmlButtonElement",
+  "HtmlIFrameElement",
+  "NodeList",
+  "ShadowRoot",
+  "SupportedType",
+  "Window",
+]

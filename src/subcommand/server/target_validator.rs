@@ -24,13 +24,14 @@ impl ValidateRequest<Body> for TargetValidator {
     }
 
     if let Some((app, content)) = packages(&self.0, path) {
-      match app.manifest {
-        Manifest::App { target, .. } => {
-          let content = content.manifest.ty();
+      match app.manifest.media {
+        Media::App { target, .. } => {
+          let content = content.manifest.media.ty();
 
           let matched = match target {
-            Target::Library => false,
+            Target::App => content == Type::App,
             Target::Comic => content == Type::Comic,
+            Target::Root => false,
           };
 
           if !matched {
@@ -41,7 +42,10 @@ impl ValidateRequest<Body> for TargetValidator {
           return Err(
             (
               StatusCode::BAD_REQUEST,
-              format!("app package is of type `{}`, not `app`", app.manifest.ty()),
+              format!(
+                "app package is of type `{}`, not `app`",
+                app.manifest.media.ty()
+              ),
             )
               .into_response(),
           )
@@ -61,17 +65,17 @@ mod tests {
   fn validator() {
     let app_package = PACKAGES.app();
     let content_package = PACKAGES.comic();
-    let library_package = PACKAGES.library();
+    let root_package = PACKAGES.root();
 
     let app = app_package.hash;
     let content = content_package.hash;
-    let library_hash = library_package.hash;
+    let root = root_package.hash;
 
     let mut library = Library::default();
 
     library.add(app_package.clone());
     library.add(content_package.clone());
-    library.add(library_package.clone());
+    library.add(root_package.clone());
 
     let library = Arc::new(library);
 
@@ -95,7 +99,7 @@ mod tests {
 
     let mut request = http::Request::builder()
       .method("GET")
-      .uri(format!("https://example.com/{library_hash}/{content}/"))
+      .uri(format!("https://example.com/{root}/{content}/"))
       .body(Body::empty())
       .unwrap();
 

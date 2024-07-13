@@ -1,0 +1,5 @@
+name: library
+
+media:
+  type: app
+  target: root
