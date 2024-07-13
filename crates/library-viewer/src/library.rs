@@ -13,7 +13,7 @@ impl Component for Library {
   }
 
   async fn initialize() -> Result<Self, JsValue> {
-    let api = media::Api::default();
+    let api = Api::default();
 
     let handlers = api.handlers().await?;
 

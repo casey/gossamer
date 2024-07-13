@@ -7,7 +7,7 @@ use {
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
     wasm_bindgen_futures,
     web_sys::{self, HtmlButtonElement, HtmlIFrameElement, PointerEvent, ShadowRoot},
-    Component, EventTargetExt, Select,
+    Api, Component, EventTargetExt, Select,
   },
   media::{Hash, Manifest, Target, Type},
   std::{collections::BTreeMap, sync::Arc},

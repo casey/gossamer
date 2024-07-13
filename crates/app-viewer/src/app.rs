@@ -14,7 +14,7 @@ impl Component for App {
   }
 
   async fn initialize() -> Result<Self, JsValue> {
-    let api = media::Api::default();
+    let api = Api::default();
 
     let manifest = api.manifest().await?;
 

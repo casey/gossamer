@@ -5,7 +5,7 @@ use {
     html_escaper::Escape,
     log,
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    wasm_bindgen_futures, Component,
+    wasm_bindgen_futures, Api, Component,
   },
   media::{Hash, Media, Target},
   std::collections::BTreeMap,

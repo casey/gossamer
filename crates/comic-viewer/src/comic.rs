@@ -12,7 +12,7 @@ impl Component for Comic {
   }
 
   async fn initialize() -> Result<Self, JsValue> {
-    let api = media::Api::default();
+    let api = Api::default();
 
     let manifest = api.manifest().await?;
 
