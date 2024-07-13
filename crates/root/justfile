@@ -15,7 +15,7 @@ package:
   mv build/index_bg.wasm build/index.wasm
   mv build/index.js build/loader.js
   rsync -avz files/ build/
-  cargo build
+  cargo build --package gossamer
   ../../target/debug/gossamer package --root build --output root.package
 
 update-modern-normalize:

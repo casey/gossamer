@@ -23,9 +23,9 @@
     <nav>
       <ul>
 %% for (hash, manifest) in &self.packages {
-%%   let ty = manifest.ty();
+%%   let ty = manifest.media.ty();
         <li>
-          {{ty}}
+          {{ manifest.name }}
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
           <button data-handler={{handler}} data-package={{hash}}>open</button>
 %%   }
