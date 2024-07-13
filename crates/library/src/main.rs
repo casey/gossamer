@@ -9,7 +9,7 @@ use {
     web_sys::{self, HtmlButtonElement, HtmlIFrameElement, PointerEvent, ShadowRoot},
     Component, EventTargetExt, Select,
   },
-  media::{Hash, Manifest, Target},
+  media::{Hash, Manifest, Target, Type},
   std::{collections::BTreeMap, sync::Arc},
 };
 

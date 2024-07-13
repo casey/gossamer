@@ -15,20 +15,41 @@
       }
 
       iframe {
+        border: 0;
+        border-left: 1px solid black;
         height: 100%;
         width: 100%;
+        display: block;
+      }
+
+      h1 {
+        margin-left: 1rem;
       }
     </style>
   </head>
   <body>
     <nav>
+      <h1>Apps</h1>
       <ul>
-%% for (hash, manifest) in &self.packages {
-%%   let ty = manifest.media.ty();
+%% for (hash, manifest) in self.packages.iter().filter(|(hash, manifest)| manifest.ty() == Type::App) {
+%%   let ty = manifest.ty();
         <li>
           {{ manifest.name }}
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
           <button data-handler={{handler}} data-package={{hash}}>open</button>
+%%   }
+        </li>
+%% }
+      </ul>
+      <h1>Content</h1>
+      <ul>
+%% for (hash, manifest) in self.packages.iter().filter(|(hash, manifest)| manifest.ty() != Type::App) {
+%%   let ty = manifest.ty();
+        <li>
+%%   if let Some(handler) = self.handlers.get(&ty.into()) {
+          <button data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
+%%   } else {
+          {{ manifest.name }}
 %%   }
         </li>
 %% }
