@@ -3,18 +3,32 @@ use super::*;
 pub trait Component: Display + Sized + 'static {
   fn name() -> &'static str;
 
-  fn define(self) {
+  async fn initialize() -> Result<Self, JsValue>;
+
+  fn define() {
+    js::define(
+      Self::name(),
+      &wasm_bindgen_futures::future_to_promise(Self::callback()),
+    );
+  }
+
+  async fn callback() -> Result<JsValue, JsValue> {
+    let component = Self::initialize().await?;
+
     let parser = DomParser::new().unwrap();
-    let html = self.to_string();
+    let html = component.to_string();
     let document = parser
       .parse_from_string(&html, SupportedType::TextHtml)
       .unwrap();
 
-    let component = Arc::new(self);
-    let closure =
-      Closure::wrap(Box::new(move |root| component.connected(root)) as Box<dyn FnMut(ShadowRoot)>);
-    js::define(Self::name(), document, &closure);
-    closure.forget();
+    let callback = Closure::once(move |root| Self::connected(&Arc::new(component), root));
+
+    let array = Array::new();
+
+    array.push(&document.into());
+    array.push(&callback.into_js_value());
+
+    Ok(array.into())
   }
 
   fn connected(self: &Arc<Self>, _root: ShadowRoot) {}

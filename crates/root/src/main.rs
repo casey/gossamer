@@ -5,12 +5,13 @@ use {
   },
   boilerplate::Boilerplate,
   html_escaper::Escape,
+  js_sys::{Array, Promise},
   media::{Hash, Manifest, Target},
   std::{collections::BTreeMap, fmt::Display, ops::Deref, sync::Arc},
   wasm_bindgen::{closure::Closure, convert::FromWasmAbi, prelude::wasm_bindgen, JsCast, JsValue},
   web_sys::{
-    Document, DocumentFragment, DomParser, EventTarget, HtmlButtonElement, HtmlIFrameElement,
-    PointerEvent, ShadowRoot, SupportedType,
+    DocumentFragment, DomParser, EventTarget, HtmlButtonElement, HtmlIFrameElement, PointerEvent,
+    ShadowRoot, SupportedType,
   },
 };
 
@@ -28,6 +29,6 @@ mod select;
 async fn main() -> Result<(), JsValue> {
   console_error_panic_hook::set_once();
   console_log::init_with_level(log::Level::Trace).unwrap();
-  MediaLibrary::new().await?.define();
+  MediaLibrary::define();
   Ok(())
 }

@@ -1,4 +1,4 @@
-export function define(name, html, connected) {
+export function define(name, callback) {
   class CustomElement extends HTMLElement {
     static get observedAttributes() {
     }
@@ -12,10 +12,11 @@ export function define(name, html, connected) {
       console.log('attribute', name, stale, fresh);
     }
 
-    connectedCallback() {
+    async connectedCallback() {
       console.log('connected');
       let shadow = this.attachShadow({ mode: 'closed' });
-      shadow.appendChild(html.documentElement);
+      let [root, connected] = await callback;
+      shadow.appendChild(root.documentElement);
       connected(shadow);
     }
 
