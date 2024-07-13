@@ -1,9 +1,6 @@
 watch +args='test':
   cargo watch --clear --exec '{{args}}'
 
-open:
-  open http://localhost:8000
-
 outdated:
   cargo outdated -R
 
@@ -27,12 +24,14 @@ build:
 clean:
   rm -rf build
 
+open:
+  open http://localhost:8000
+
 serve: (package "library-viewer") (package "comic-viewer")
   cargo build
   mkdir -p target/packages
   target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
   target/debug/gossamer server \
-    --open \
     --address 127.0.0.1:8000 \
     --packages build/library-viewer.package build/comic-viewer.package build/test-comic.package
 
