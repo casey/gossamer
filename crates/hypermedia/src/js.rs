@@ -1,6 +1,6 @@
-use super::*;
+use {super::*, wasm_bindgen::prelude::wasm_bindgen};
 
-#[wasm_bindgen::prelude::wasm_bindgen(module = "/js/define.js")]
+#[wasm_bindgen(module = "/js/define.js")]
 extern "C" {
   pub fn define(name: &str, connected: &Promise);
 }
