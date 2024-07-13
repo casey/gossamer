@@ -6,3 +6,9 @@ pub struct Manifest {
   pub name: String,
   pub media: Media,
 }
+
+impl Manifest {
+  pub fn ty(&self) -> Type {
+    self.media.ty()
+  }
+}

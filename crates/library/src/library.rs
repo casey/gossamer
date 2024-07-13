@@ -3,7 +3,7 @@ use super::*;
 #[derive(Boilerplate)]
 #[boilerplate(filename = "library.html")]
 pub struct Library {
-  pub packages: BTreeMap<Hash, Manifest>,
+  pub packages: Vec<(Hash, Manifest)>,
   pub handlers: BTreeMap<Target, Hash>,
 }
 
@@ -15,8 +15,15 @@ impl Component for Library {
   async fn initialize() -> Result<Self, JsValue> {
     let api = media::Api::default();
 
-    let packages = api.packages().await?;
     let handlers = api.handlers().await?;
+
+    let mut packages = api
+      .packages()
+      .await?
+      .into_iter()
+      .collect::<Vec<(Hash, Manifest)>>();
+
+    packages.sort_by(|x, y| x.1.name.cmp(&y.1.name));
 
     Ok(Self { packages, handlers })
   }
