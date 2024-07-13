@@ -106,7 +106,7 @@ impl Server {
             .route("/favicon.ico", get(Self::favicon))
             .route("/api/packages", get(Self::packages))
             .route("/api/handlers", get(Self::handlers))
-            .route("/app/*path", get(Self::library_app))
+            .route("/app/*path", get(Self::root_app))
             .route("/:app/:content/", get(Self::app_root))
             .route("/:app/:content/api/manifest", get(Self::manifest))
             .route("/:app/:content/app/*path", get(Self::app))
@@ -199,7 +199,7 @@ impl Server {
     Cbor(library.handlers().clone())
   }
 
-  async fn library_app(library: Extension<Arc<Library>>, path: Path<String>) -> ServerResult {
+  async fn root_app(library: Extension<Arc<Library>>, path: Path<String>) -> ServerResult {
     Self::file(
       library
         .handler(Target::Root)
@@ -297,6 +297,27 @@ mod tests {
     assert!(str::from_utf8(&root.content)
       .unwrap()
       .contains("<title>Library</title>"));
+
+    let root_app = Server::root_app(library.clone(), Path("index.html".into()))
+      .await
+      .unwrap();
+    assert_eq!(root_app.content_type, mime::TEXT_HTML);
+    assert!(str::from_utf8(&root_app.content)
+      .unwrap()
+      .contains("<title>Library</title>"));
+
+    let packages = Server::packages(library.clone()).await;
+    assert_eq!(
+      packages.0,
+      library
+        .packages()
+        .iter()
+        .map(|(hash, package)| (*hash, package.manifest.clone()))
+        .collect()
+    );
+
+    let handlers = Server::handlers(library.clone()).await;
+    assert_eq!(&handlers.0, library.handlers());
 
     let favicon = Server::favicon(library.clone()).await.unwrap();
     assert_eq!(favicon.content_type, "image/x-icon");
