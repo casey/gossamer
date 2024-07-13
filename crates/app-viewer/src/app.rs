@@ -4,8 +4,8 @@ use super::*;
 #[boilerplate(filename = "app.html")]
 pub struct App {
   name: String,
-  target: Target,
   paths: BTreeMap<String, Hash>,
+  target: Target,
 }
 
 impl Component for App {
