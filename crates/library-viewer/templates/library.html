@@ -34,9 +34,10 @@
 %% for (hash, manifest) in self.packages.iter().filter(|(hash, manifest)| manifest.ty() == Type::App) {
 %%   let ty = manifest.ty();
         <li>
-          {{ manifest.name }}
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
-          <button data-handler={{handler}} data-package={{hash}}>open</button>
+          <button data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
+%%   } else {
+          {{ manifest.name }}
 %%   }
         </li>
 %% }

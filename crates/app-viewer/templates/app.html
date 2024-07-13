@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset=utf-8>
+    <link rel=stylesheet href=app/modern-normalize.css>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+      }
+
+      html {
+        height: 100%;
+      }
+
+      img {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>{{self.name}}</h1>
+    Target: {{self.target}}
+    <ul>
+%% for (path, hash) in &self.paths {
+      <li>{{path}}: {{hash}}</li>
+%% }
+    </ul>
+  </body>
+</html>

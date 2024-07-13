@@ -1,0 +1,5 @@
+name: App Viewer
+
+media:
+  type: app
+  target: app

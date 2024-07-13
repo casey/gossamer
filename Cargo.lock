@@ -76,6 +76,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "app-viewer"
+version = "0.0.0"
+dependencies = [
+ "hypermedia",
+ "media",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
