@@ -1,9 +1,6 @@
 watch +args='test':
   cargo watch --clear --exec '{{args}}'
 
-open:
-  open http://localhost:8000
-
 outdated:
   cargo outdated -R
 
@@ -25,19 +22,18 @@ build:
   cargo build
 
 clean:
-  cargo clean
-  rm -rf tmp
-  rm -rf crates/library/build
-  rm -rf crates/library/library.package
+  rm -rf build
 
-serve: (package "library") (package "comic")
+open:
+  open http://localhost:8000
+
+serve: (package "library-viewer") (package "comic-viewer")
   cargo build
   mkdir -p target/packages
-  target/debug/gossamer package --root tests/packages/comic --output target/packages/comic.package
+  target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
   target/debug/gossamer server \
-    --open \
     --address 127.0.0.1:8000 \
-    --packages build/library.package build/comic.package target/packages/comic.package
+    --packages build/library-viewer.package build/comic-viewer.package build/test-comic.package
 
 package crate: build files
   rm -rf build/{{crate}}
