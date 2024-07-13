@@ -250,12 +250,12 @@ impl Package {
   }
 
   pub fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
-    match &self.manifest {
-      Manifest::App { paths, .. } => Some((
+    match &self.manifest.media {
+      Media::App { paths, .. } => Some((
         mime_guess::from_path(path).first_or_octet_stream(),
         self.files.get(paths.get(path)?).unwrap().clone(),
       )),
-      Manifest::Comic { pages } => {
+      Media::Comic { pages, .. } => {
         if path.len() > 1 && path.starts_with('0') {
           return None;
         }
@@ -280,9 +280,9 @@ impl Package {
     let mut extra = 0u64;
     let mut missing = 0u64;
 
-    let expected: HashSet<Hash> = match manifest {
-      Manifest::App { paths, .. } => paths.values().copied().collect(),
-      Manifest::Comic { pages } => pages.iter().copied().collect(),
+    let expected: HashSet<Hash> = match &manifest.media {
+      Media::App { paths, .. } => paths.values().copied().collect(),
+      Media::Comic { pages, .. } => pages.iter().copied().collect(),
     };
 
     for hash in &expected {
@@ -436,7 +436,7 @@ mod tests {
   fn file_truncated() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("package.package");
+    let package = tempdir.join("package.package");
 
     let mut bytes = Vec::new();
 
@@ -459,7 +459,7 @@ mod tests {
   fn trailing_bytes() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("package.package");
+    let package = tempdir.join("package.package");
 
     let mut bytes = Vec::new();
 
@@ -482,7 +482,7 @@ mod tests {
   fn manifest_deserialize_error() {
     let tempdir = tempdir();
 
-    let package = tempdir.path_utf8().join("package.package");
+    let package = tempdir.join("package.package");
 
     let mut bytes = Vec::new();
 
@@ -504,22 +504,24 @@ mod tests {
   fn save_and_load() {
     let tempdir = tempdir();
 
-    let output = tempdir.path_utf8().join("package.package");
+    let output = tempdir.join("package.package");
 
-    let root = tempdir.path_utf8().join("root");
+    let root = tempdir.join("root");
 
-    fs::create_dir(&root).unwrap();
-    fs::write(root.join("index.html"), "html").unwrap();
-    fs::write(root.join("index.js"), "js").unwrap();
+    tempdir.write("root/index.html", "html");
+    tempdir.write("root/index.js", "js");
 
     let html = Hash::bytes(b"html");
     let js = Hash::bytes(b"js");
 
-    let manifest = Manifest::App {
-      target: Target::Comic,
-      paths: vec![("index.html".into(), html), ("index.js".into(), js)]
-        .into_iter()
-        .collect(),
+    let manifest = Manifest {
+      name: "app-comic".into(),
+      media: Media::App {
+        target: Target::Comic,
+        paths: vec![("index.html".into(), html), ("index.js".into(), js)]
+          .into_iter()
+          .collect(),
+      },
     };
 
     let manifest_bytes = {

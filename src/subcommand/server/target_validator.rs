@@ -24,9 +24,9 @@ impl ValidateRequest<Body> for TargetValidator {
     }
 
     if let Some((app, content)) = packages(&self.0, path) {
-      match app.manifest {
-        Manifest::App { target, .. } => {
-          let content = content.manifest.ty();
+      match app.manifest.media {
+        Media::App { target, .. } => {
+          let content = content.manifest.media.ty();
 
           let matched = match target {
             Target::App => content == Type::App,
@@ -42,7 +42,10 @@ impl ValidateRequest<Body> for TargetValidator {
           return Err(
             (
               StatusCode::BAD_REQUEST,
-              format!("app package is of type `{}`, not `app`", app.manifest.ty()),
+              format!(
+                "app package is of type `{}`, not `app`",
+                app.manifest.media.ty()
+              ),
             )
               .into_response(),
           )

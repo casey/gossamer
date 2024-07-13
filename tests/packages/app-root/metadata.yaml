@@ -1,2 +1,5 @@
-type: app
-target: root
+name: app-root
+
+media:
+  type: app
+  target: root

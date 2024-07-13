@@ -195,7 +195,17 @@ mod tests {
 
     fs::create_dir(&root_dir).unwrap();
 
-    fs::write(root_dir.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
+    fs::write(
+      root_dir.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "app-comic".into(),
+        media: metadata::Media::App {
+          target: Target::Comic,
+        },
+      })
+      .unwrap(),
+    )
+    .unwrap();
 
     assert_matches!(
       Package {
@@ -236,7 +246,17 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "app-comic".into(),
+        media: metadata::Media::App {
+          target: Target::Comic,
+        },
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("index.html"), "foo").unwrap();
     fs::write(root.join("index.js"), "bar").unwrap();
 
@@ -259,7 +279,7 @@ mod tests {
 
     let manifest = Hash::bytes(&manifest_bytes);
 
-    let Manifest::App { target, paths } = package.manifest else {
+    let Media::App { target, paths } = package.manifest.media else {
       panic!("unexpected manifest type");
     };
 
@@ -286,7 +306,17 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: app\ntarget: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "app-comic".into(),
+        media: metadata::Media::App {
+          target: Target::Comic,
+        },
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("index.html"), "foo").unwrap();
     fs::write(root.join("index.js"), "foo").unwrap();
 
@@ -311,7 +341,16 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
+
     fs::write(root.join("0.jpg"), "foo").unwrap();
     fs::write(root.join("1.jpg"), "bar").unwrap();
 
@@ -334,7 +373,7 @@ mod tests {
 
     let manifest = Hash::bytes(&manifest_bytes);
 
-    let Manifest::Comic { pages } = package.manifest else {
+    let Media::Comic { pages } = package.manifest.media else {
       panic!("unexpected manifest type");
     };
 
@@ -359,7 +398,15 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("0.jpg"), "").unwrap();
     fs::create_dir(root.join("bar")).unwrap();
 
@@ -375,7 +422,15 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("0.jpg"), "").unwrap();
     fs::write(root.join(".DS_Store"), "").unwrap();
 
@@ -391,7 +446,15 @@ mod tests {
 
     fs::create_dir(&root_dir).unwrap();
 
-    fs::write(root_dir.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root_dir.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
 
     assert_matches!(
       Package {
@@ -417,7 +480,15 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("1.jpg"), "").unwrap();
 
     assert_matches!(
@@ -444,7 +515,15 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("0.jpg"), "").unwrap();
     fs::write(root.join("00.jpg"), "").unwrap();
 
@@ -472,7 +551,15 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
     fs::write(root.join("0.jpg"), "").unwrap();
     fs::write(root.join("foo.jpg"), "").unwrap();
 
@@ -501,7 +588,16 @@ mod tests {
 
     fs::create_dir(&root).unwrap();
 
-    fs::write(root.join("metadata.yaml"), "type: comic").unwrap();
+    fs::write(
+      root.join("metadata.yaml"),
+      serde_yaml::to_string(&Metadata {
+        name: "comic".into(),
+        media: metadata::Media::Comic,
+      })
+      .unwrap(),
+    )
+    .unwrap();
+
     fs::write(root.join(format!("{}.jpg", u128::from(u64::MAX) + 1)), "").unwrap();
 
     assert_matches!(

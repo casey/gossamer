@@ -8,7 +8,7 @@ pub struct Library {
 
 impl Library {
   pub fn add(&mut self, package: Package) {
-    if let Manifest::App { target, .. } = &package.manifest {
+    if let Media::App { target, .. } = &package.manifest.media {
       self.handlers.insert(*target, package.hash);
     }
 

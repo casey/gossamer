@@ -1,2 +1,5 @@
-type: app
-target: comic
+name: app-comic
+
+media:
+  type: app
+  target: comic

@@ -8,11 +8,23 @@ pub fn tempdir() -> TempDir {
 
 pub trait TempDirExt {
   fn path_utf8(&self) -> &Utf8Path;
+
+  fn write(&self, path: &str, data: impl AsRef<[u8]>);
+
+  fn join(&self, path: &str) -> Utf8PathBuf {
+    self.path_utf8().join(path)
+  }
 }
 
 impl TempDirExt for TempDir {
   fn path_utf8(&self) -> &Utf8Path {
     self.path().try_into().unwrap()
+  }
+
+  fn write(&self, path: &str, data: impl AsRef<[u8]>) {
+    let path = self.path_utf8().join(path);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, data).unwrap();
   }
 }
 

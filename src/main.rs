@@ -17,7 +17,7 @@ use {
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
   libc::EXIT_FAILURE,
-  media::{Hash, Manifest, Target, Type},
+  media::{Hash, Manifest, Media, Target, Type},
   mime_guess::{mime, Mime},
   regex::Regex,
   regex_static::{lazy_regex, once_cell::sync::Lazy},

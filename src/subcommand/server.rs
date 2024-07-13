@@ -321,7 +321,7 @@ mod tests {
     .unwrap();
     assert_eq!(manifest.content_type, mime::APPLICATION_JSON);
     assert!(
-      manifest.content.starts_with(b"{\"type\":\"comic\""),
+      manifest.content.starts_with(b"{\"name\":\"test-comic\""),
       "{}",
       String::from_utf8(manifest.content).unwrap()
     );

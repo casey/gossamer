@@ -13,10 +13,11 @@ use {
   wasm_bindgen::JsValue,
 };
 
-pub use {api::Api, hash::Hash, manifest::Manifest, target::Target, ty::Type};
+pub use {api::Api, hash::Hash, manifest::Manifest, media::Media, target::Target, ty::Type};
 
 mod api;
 mod hash;
 mod manifest;
+mod media;
 mod target;
 mod ty;
