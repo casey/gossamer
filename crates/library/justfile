@@ -4,9 +4,9 @@ package:
   rm -rf build
   mkdir build
   cargo build \
-    --package root \
+    --package library \
     --target wasm32-unknown-unknown
-  cp ../../target/wasm32-unknown-unknown/debug/root.wasm build/index.wasm
+  cp ../../target/wasm32-unknown-unknown/debug/library.wasm build/index.wasm
   wasm-bindgen \
     --target web \
     --no-typescript \
@@ -16,7 +16,7 @@ package:
   mv build/index.js build/loader.js
   rsync -avz --exclude .DS_Store files/ build/
   cargo build --package gossamer
-  ../../target/debug/gossamer package --root build --output root.package
+  ../../target/debug/gossamer package --root build --output library.package
 
 update-modern-normalize:
   curl \

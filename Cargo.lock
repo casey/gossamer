@@ -832,6 +832,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
 
 [[package]]
+name = "library"
+version = "0.0.0"
+dependencies = [
+ "boilerplate",
+ "console_error_panic_hook",
+ "console_log",
+ "html-escaper",
+ "js-sys",
+ "log",
+ "media",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1208,22 +1224,6 @@ dependencies = [
  "spin",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "root"
-version = "0.0.0"
-dependencies = [
- "boilerplate",
- "console_error_panic_hook",
- "console_log",
- "html-escaper",
- "js-sys",
- "log",
- "media",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

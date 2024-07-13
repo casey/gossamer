@@ -1,6 +1,6 @@
 set unstable
 
-mod root 'crates/root'
+mod library 'crates/library'
 
 watch +args='test':
   cargo watch --clear --exec '{{args}}'
@@ -31,8 +31,8 @@ build:
 clean:
   cargo clean
   rm -rf tmp
-  rm -rf crates/root/build
-  rm -rf crates/root/root.package
+  rm -rf crates/library/build
+  rm -rf crates/library/library.package
 
 serve: build
   rm -rf tmp
@@ -46,7 +46,7 @@ serve: build
     --packages tmp/root.package tmp/app.package tmp/comic.package
 
 apps:
-  just root package
+  just library package
   cargo build
   mkdir -p target/packages
   target/debug/gossamer package --root tests/packages/app-comic --output target/packages/app.package
@@ -54,4 +54,4 @@ apps:
   target/debug/gossamer server \
     --open \
     --address 127.0.0.1:8000 \
-    --packages crates/root/root.package target/packages/app.package target/packages/comic.package
+    --packages crates/library/library.package target/packages/app.package target/packages/comic.package
