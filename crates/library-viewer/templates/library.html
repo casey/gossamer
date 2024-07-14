@@ -10,6 +10,21 @@
         height: 100%;
       }
 
+      button {
+        background: none!important;
+        border: none;
+        cursor: pointer;
+        padding: 0!important;
+      }
+
+      button:hover {
+        text-decoration: underline;
+      }
+
+      h1 {
+        margin-left: 1rem;
+      }
+
       html {
         height: 100%;
       }
@@ -21,10 +36,6 @@
         width: 100%;
         display: block;
       }
-
-      h1 {
-        margin-left: 1rem;
-      }
     </style>
   </head>
   <body>
@@ -34,9 +45,10 @@
 %% for (hash, manifest) in self.packages.iter().filter(|(hash, manifest)| manifest.ty() == Type::App) {
 %%   let ty = manifest.ty();
         <li>
-          {{ manifest.name }}
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
-          <button data-handler={{handler}} data-package={{hash}}>open</button>
+          <button data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
+%%   } else {
+          {{ manifest.name }}
 %%   }
         </li>
 %% }

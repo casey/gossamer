@@ -3,7 +3,7 @@ use super::*;
 pub trait Component: Display + Sized + 'static {
   fn name() -> &'static str;
 
-  async fn initialize() -> Result<Self, JsValue>;
+  async fn initialize() -> Result<Self, Error>;
 
   fn define() {
     js::define(
@@ -13,9 +13,19 @@ pub trait Component: Display + Sized + 'static {
   }
 
   async fn callback() -> Result<JsValue, JsValue> {
-    let component = Self::initialize().await?;
-
     let parser = DomParser::new().unwrap();
+
+    let component = match Self::initialize().await {
+      Ok(component) => component,
+      Err(err) => {
+        log::error!("error initializing <{}>: {err}", Self::name());
+        let document = parser
+          .parse_from_string(&Dialog(err).to_string(), SupportedType::TextHtml)
+          .unwrap();
+        return Err(document.into());
+      }
+    };
+
     let html = component.to_string();
     let document = parser
       .parse_from_string(&html, SupportedType::TextHtml)

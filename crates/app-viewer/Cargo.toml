@@ -1,5 +1,5 @@
 [package]
-name = "comic-viewer"
+name = "app-viewer"
 version = "0.0.0"
 edition = "2021"
 publish = false

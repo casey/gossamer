@@ -12,8 +12,8 @@ impl Component for Library {
     "media-library"
   }
 
-  async fn initialize() -> Result<Self, JsValue> {
-    let api = media::Api::default();
+  async fn initialize() -> Result<Self, Error> {
+    let api = Api::default();
 
     let handlers = api.handlers().await?;
 

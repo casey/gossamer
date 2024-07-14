@@ -1,21 +1,37 @@
-#![allow(async_fn_in_trait)]
+#![allow(async_fn_in_trait, clippy::result_large_err)]
 
 use {
-  self::error::Error,
+  self::dialog::Dialog,
+  boilerplate::Boilerplate,
+  html_escaper::Escape,
   js_sys::{Array, Promise},
-  snafu::Snafu,
-  std::{fmt::Display, ops::Deref, sync::Arc},
+  media::{Hash, Manifest, Target, Type},
+  reqwest::{StatusCode, Url},
+  serde::de::DeserializeOwned,
+  snafu::{ensure, ResultExt, Snafu},
+  std::{
+    collections::BTreeMap,
+    fmt::Display,
+    io::{self, Cursor},
+    ops::Deref,
+    sync::Arc,
+  },
   wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast, JsError, JsValue},
   web_sys::{DocumentFragment, DomParser, EventTarget, ShadowRoot, SupportedType},
 };
 
 pub use {
-  self::{cast::Cast, component::Component, event_target_ext::EventTargetExt, select::Select},
-  boilerplate, html_escaper, js_sys, log, wasm_bindgen, wasm_bindgen_futures, web_sys,
+  self::{
+    api::Api, cast::Cast, component::Component, error::Error, event_target_ext::EventTargetExt,
+    select::Select,
+  },
+  boilerplate, html_escaper, js_sys, log, media, wasm_bindgen, wasm_bindgen_futures, web_sys,
 };
 
+mod api;
 mod cast;
 mod component;
+mod dialog;
 mod error;
 mod event_target_ext;
 mod js;

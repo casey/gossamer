@@ -76,6 +76,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "app-viewer"
+version = "0.0.0"
+dependencies = [
+ "hypermedia",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -353,7 +360,6 @@ name = "comic-viewer"
 version = "0.0.0"
 dependencies = [
  "hypermedia",
- "media",
 ]
 
 [[package]]
@@ -766,11 +772,15 @@ name = "hypermedia"
 version = "0.0.0"
 dependencies = [
  "boilerplate",
+ "ciborium",
  "console_error_panic_hook",
  "console_log",
  "html-escaper",
  "js-sys",
  "log",
+ "media",
+ "reqwest",
+ "serde",
  "snafu",
  "wasm-bindgen",
  "wasm-bindgen-futures",
@@ -860,7 +870,6 @@ name = "library-viewer"
 version = "0.0.0"
 dependencies = [
  "hypermedia",
- "media",
  "web-sys",
 ]
 
@@ -888,15 +897,9 @@ version = "0.0.0"
 dependencies = [
  "blake3",
  "ciborium",
- "js-sys",
- "reqwest",
  "serde",
  "serde_bytes",
- "serde_json",
- "snafu",
  "strum",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]

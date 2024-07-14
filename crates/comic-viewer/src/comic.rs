@@ -11,13 +11,16 @@ impl Component for Comic {
     "media-comic"
   }
 
-  async fn initialize() -> Result<Self, JsValue> {
-    let api = media::Api::default();
+  async fn initialize() -> Result<Self, Error> {
+    let api = Api::default();
 
     let manifest = api.manifest().await?;
 
     let Media::Comic { pages } = manifest.media else {
-      panic!()
+      return Err(Error::ContentType {
+        content: manifest.ty(),
+        target: Target::Comic,
+      });
     };
 
     Ok(Self { pages: pages.len() })
