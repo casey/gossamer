@@ -7,25 +7,26 @@
       body {
         display: flex;
         flex-direction: column;
+        gap: 1rem;
         height: 100%;
+        margin: 1rem;
       }
 
       html {
         height: 100%;
       }
-
-      img {
-        width: 100%;
-      }
     </style>
   </head>
   <body>
     <h1>{{self.name}}</h1>
-    Target: {{self.target}}
-    <ul>
+    <div>target: {{self.target}}</div>
+    <div>
+      files:
+      <ul>
 %% for (path, hash) in &self.paths {
-      <li>{{path}}: {{hash}}</li>
+        <li>{{path}}: {{hash}}</li>
 %% }
-    </ul>
+      </ul>
+    </div>
   </body>
 </html>
