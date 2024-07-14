@@ -1,4 +1,4 @@
-#![allow(async_fn_in_trait)]
+#![allow(async_fn_in_trait, clippy::result_large_err)]
 
 use {
   self::dialog::Dialog,
