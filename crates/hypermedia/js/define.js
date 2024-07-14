@@ -8,7 +8,6 @@ export function define(name, callback) {
         connected(shadow);
       } catch (error) {
         shadow.appendChild(error.documentElement);
-        console.log(error);
       }
     }
   }
