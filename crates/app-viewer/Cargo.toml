@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 hypermedia = { path = "../hypermedia" }
+xilem_web = { git = "https://github.com/linebender/xilem.git" }

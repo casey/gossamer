@@ -25,14 +25,13 @@ clean:
   rm -rf build
 
 open:
-  open http://127.0.0.1:8000
+  open http://localhost
 
-serve: (package "app-viewer") (package "comic-viewer") (package "library-viewer")
-  cargo build
+serve port="80": build (package 'app-viewer') (package 'comic-viewer') (package 'library-viewer')
   mkdir -p target/packages
   target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
-  target/debug/gossamer server \
-    --address 127.0.0.1:8000 \
+  RUST_LOG=gossamer=trace target/debug/gossamer server \
+    --http-port {{port}} \
     --packages \
       build/app-viewer.package \
       build/comic-viewer.package \
@@ -53,7 +52,7 @@ package crate: build files
     --out-dir build/{{crate}}
   mv build/{{crate}}/index_bg.wasm build/{{crate}}/index.wasm
   mv build/{{crate}}/index.js build/{{crate}}/loader.js
-  rsync -avz --exclude .DS_Store files/ build/files/ crates/{{crate}}/files/ build/{{crate}}/
+  rsync -aqvz --exclude .DS_Store files/ build/files/ crates/{{crate}}/files/ build/{{crate}}/
   target/debug/gossamer package --root build/{{crate}} --output build/{{crate}}.package
 
 files:

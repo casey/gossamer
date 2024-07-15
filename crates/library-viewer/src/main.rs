@@ -1,23 +1,24 @@
 use {
-  self::library::Library,
+  self::{state::State, view::View},
   hypermedia::{
-    boilerplate::Boilerplate,
-    html_escaper::Escape,
     log,
-    media::{Hash, Manifest, Target, Type},
+    media::{api, Hash, Id, Manifest, Target, Type},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    wasm_bindgen_futures,
-    web_sys::{self, HtmlButtonElement, HtmlIFrameElement, PointerEvent, ShadowRoot},
-    Api, Component, Error, EventTargetExt, Select,
+    Api,
   },
-  std::{collections::BTreeMap, sync::Arc},
+  std::collections::BTreeMap,
+  xilem_web::{
+    concurrent::memoized_await, core::fork, elements::html, interfaces::Element, App, DomFragment,
+    DomView,
+  },
 };
 
-mod library;
+mod state;
+mod view;
 
 #[wasm_bindgen(main)]
-async fn main() -> Result<(), JsValue> {
+fn main() -> Result<(), JsValue> {
   hypermedia::initialize_console(log::Level::Trace)?;
-  Library::define();
+  App::new(hypermedia::body()?, State::default(), State::update).run();
   Ok(())
 }

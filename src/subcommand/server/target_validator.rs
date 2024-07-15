@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Clone)]
-pub struct TargetValidator(pub Arc<Library>);
+pub(crate) struct TargetValidator(pub(crate) Arc<Library>);
 
 impl ValidateRequest<Body> for TargetValidator {
   type ResponseBody = Body;

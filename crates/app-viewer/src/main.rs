@@ -1,21 +1,21 @@
 use {
-  self::app::App,
+  self::{app::App, state::State},
   hypermedia::{
-    boilerplate::Boilerplate,
-    html_escaper::Escape,
     log,
     media::{Hash, Media, Target},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    wasm_bindgen_futures, Api, Component, Error,
+    wasm_bindgen_futures, Api,
   },
   std::collections::BTreeMap,
+  xilem_web::{concurrent::memoized_await, core::fork, elements::html, DomView},
 };
 
 mod app;
+mod state;
 
 #[wasm_bindgen(main)]
 async fn main() -> Result<(), JsValue> {
   hypermedia::initialize_console(log::Level::Trace)?;
-  App::define();
+  xilem_web::App::new(hypermedia::body()?, State::default(), State::update).run();
   Ok(())
 }

@@ -1,6 +1,6 @@
 use super::*;
 
-pub struct DeserializeFromStr<T: FromStr>(pub T);
+pub(crate) struct DeserializeFromStr<T: FromStr>(pub(crate) T);
 
 impl<'de, T: FromStr> Deserialize<'de> for DeserializeFromStr<T>
 where
@@ -13,6 +13,22 @@ where
     Ok(Self(
       FromStr::from_str(&String::deserialize(deserializer)?).map_err(serde::de::Error::custom)?,
     ))
+  }
+}
+
+impl<T: FromStr> Deref for DeserializeFromStr<T> {
+  type Target = T;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    &self.0
+  }
+}
+
+impl<T: FromStr> DerefMut for DeserializeFromStr<T> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.0
   }
 }
 

@@ -1,18 +1,22 @@
 use super::*;
 
-pub trait Cbor: Sized {
+pub trait ToCbor: Sized {
   fn to_cbor(&self) -> Vec<u8>;
-
-  fn from_cbor(cbor: &[u8]) -> Result<Self, ciborium::de::Error<io::Error>>;
 }
 
-impl<T: DeserializeOwned + Serialize> Cbor for T {
+impl<T: Serialize> ToCbor for T {
   fn to_cbor(&self) -> Vec<u8> {
     let mut buffer = Vec::new();
     ciborium::into_writer(self, &mut buffer).unwrap();
     buffer
   }
+}
 
+pub trait FromCbor: Sized {
+  fn from_cbor(cbor: &[u8]) -> Result<Self, ciborium::de::Error<io::Error>>;
+}
+
+impl<T: DeserializeOwned> FromCbor for T {
   fn from_cbor(cbor: &[u8]) -> Result<Self, ciborium::de::Error<io::Error>> {
     ciborium::from_reader(Cursor::new(cbor))
   }

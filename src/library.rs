@@ -1,13 +1,13 @@
 use super::*;
 
 #[derive(Default)]
-pub struct Library {
-  packages: BTreeMap<Hash, Package>,
-  handlers: BTreeMap<Target, Hash>,
+pub(crate) struct Library {
+  pub(crate) handlers: BTreeMap<Target, Hash>,
+  pub(crate) packages: BTreeMap<Hash, Package>,
 }
 
 impl Library {
-  pub fn add(&mut self, package: Package) {
+  pub(crate) fn add(&mut self, package: Package) {
     if let Media::App { target, .. } = &package.manifest.media {
       self.handlers.insert(*target, package.hash);
     }
@@ -15,22 +15,22 @@ impl Library {
     self.packages.insert(package.hash, package);
   }
 
-  pub fn package(&self, hash: Hash) -> Option<&Package> {
+  pub(crate) fn package(&self, hash: Hash) -> Option<&Package> {
     self.packages.get(&hash)
   }
 
-  pub fn packages(&self) -> &BTreeMap<Hash, Package> {
+  pub(crate) fn packages(&self) -> &BTreeMap<Hash, Package> {
     &self.packages
   }
 
-  pub fn handler(&self, target: Target) -> Option<&Package> {
+  pub(crate) fn handler(&self, target: Target) -> Option<&Package> {
     self
       .handlers
       .get(&target)
       .map(|hash| self.packages.get(hash).unwrap())
   }
 
-  pub fn handlers(&self) -> &BTreeMap<Target, Hash> {
+  pub(crate) fn handlers(&self) -> &BTreeMap<Target, Hash> {
     &self.handlers
   }
 }

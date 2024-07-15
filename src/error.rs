@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(false)), visibility(pub))]
-pub enum Error {
+pub(crate) enum Error {
   #[snafu(display("app package must be of type `app` not `{ty}`"))]
   AppType {
     backtrace: Option<Backtrace>,
@@ -40,6 +40,11 @@ pub enum Error {
   MetadataMissing {
     backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
+  },
+  #[snafu(display("failed to initialize node"))]
+  NodeInitialize {
+    backtrace: Option<Backtrace>,
+    source: node::Error,
   },
   #[snafu(display("comic package in `{root}` contains no pages"))]
   NoPages {
@@ -115,27 +120,4 @@ pub enum Error {
     root: Utf8PathBuf,
     source: walkdir::Error,
   },
-}
-
-impl Error {
-  pub fn report(&self) {
-    eprintln!("error: {self}");
-
-    for (i, err) in self.iter_chain().skip(1).enumerate() {
-      if i == 0 {
-        eprintln!();
-        eprintln!("because:");
-      }
-
-      eprintln!("- {err}");
-    }
-
-    if let Some(backtrace) = self.backtrace() {
-      if backtrace.status() == BacktraceStatus::Captured {
-        eprintln!();
-        eprintln!("backtrace:");
-        eprintln!("{backtrace}");
-      }
-    }
-  }
 }

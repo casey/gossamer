@@ -13,13 +13,17 @@ pub enum Error {
     source: ciborium::de::Error<io::Error>,
   },
   #[snafu(display("request to {url} failed"))]
-  Request { url: Url, source: reqwest::Error },
+  Request {
+    url: Url,
+    source: reqwest::Error,
+  },
   #[snafu(display("response from {url} failed with {status}"))]
-  Status { url: Url, status: StatusCode },
-  #[snafu(display(
-    "content package of type `{content}` cannot be opened by app with target `{target}`"
-  ))]
-  ContentType { content: Type, target: Target },
+  Status {
+    url: Url,
+    status: StatusCode,
+  },
+  WindowMissing,
+  BodyMissing,
 }
 
 impl From<Error> for JsValue {

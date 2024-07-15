@@ -1,42 +1,41 @@
 #![allow(async_fn_in_trait, clippy::result_large_err)]
 
 use {
-  self::dialog::Dialog,
-  boilerplate::Boilerplate,
-  html_escaper::Escape,
-  js_sys::{Array, Promise},
-  media::{Hash, Manifest, Target, Type},
+  media::{Hash, Id, Manifest, Target},
   reqwest::{StatusCode, Url},
   serde::de::DeserializeOwned,
-  snafu::{ensure, ResultExt, Snafu},
+  snafu::{ensure, OptionExt, ResultExt, Snafu},
   std::{
     collections::BTreeMap,
-    fmt::Display,
     io::{self, Cursor},
-    ops::Deref,
-    sync::Arc,
   },
-  wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast, JsError, JsValue},
-  web_sys::{DocumentFragment, DomParser, EventTarget, ShadowRoot, SupportedType},
+  wasm_bindgen::{JsCast, JsError, JsValue},
+  web_sys::HtmlBodyElement,
 };
 
 pub use {
-  self::{
-    api::Api, cast::Cast, component::Component, error::Error, event_target_ext::EventTargetExt,
-    select::Select,
-  },
-  boilerplate, html_escaper, js_sys, log, media, wasm_bindgen, wasm_bindgen_futures, web_sys,
+  self::{api::Api, cast::Cast, error::Error},
+  js_sys, log, media, wasm_bindgen, wasm_bindgen_futures, web_sys,
 };
+
+type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 mod api;
 mod cast;
-mod component;
-mod dialog;
 mod error;
-mod event_target_ext;
-mod js;
 mod macros;
-mod select;
+
+pub fn body() -> Result<HtmlBodyElement> {
+  Ok(
+    web_sys::window()
+      .context(error::WindowMissing)?
+      .document()
+      .expect("document missing")
+      .body()
+      .context(error::BodyMissing)?
+      .cast(),
+  )
+}
 
 pub fn initialize_console(level: log::Level) -> Result<(), Error> {
   console_error_panic_hook::set_once();

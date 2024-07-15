@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(false)), visibility(pub))]
-pub enum Error {
+pub(crate) enum Error {
   #[snafu(display("failed to deserialize manifest"))]
   DeserializeManifest {
     backtrace: Option<Backtrace>,
@@ -85,16 +85,16 @@ pub enum Error {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Package {
-  pub files: HashMap<Hash, Vec<u8>>,
-  pub hash: Hash,
-  pub manifest: Manifest,
+pub(crate) struct Package {
+  pub(crate) files: HashMap<Hash, Vec<u8>>,
+  pub(crate) hash: Hash,
+  pub(crate) manifest: Manifest,
 }
 
 impl Package {
-  pub const MAGIC_BYTES: &'static str = "MEDIA📦\r\n\x1a\n\0";
+  pub(crate) const MAGIC_BYTES: &'static str = "MEDIA📦\r\n\x1a\n\0";
 
-  pub fn load(path: &Utf8Path) -> Result<Self, Error> {
+  pub(crate) fn load(path: &Utf8Path) -> Result<Self, Error> {
     let file = File::open(path)?;
 
     let len = file.metadata()?.len();
@@ -188,7 +188,7 @@ impl Package {
     })
   }
 
-  pub fn save(
+  pub(crate) fn save(
     hashes: HashMap<Utf8PathBuf, (Hash, u64)>,
     manifest: &Manifest,
     output: &Utf8Path,
@@ -245,7 +245,7 @@ impl Package {
     Ok(())
   }
 
-  pub fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
+  pub(crate) fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
     match &self.manifest.media {
       Media::App { paths, .. } => Some((
         mime_guess::from_path(path).first_or_octet_stream(),
@@ -268,7 +268,7 @@ impl Package {
     }
   }
 
-  pub fn verify(
+  pub(crate) fn verify(
     files: &HashMap<Hash, Vec<u8>>,
     manifest: &Manifest,
     manifest_hash: Hash,

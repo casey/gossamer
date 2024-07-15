@@ -30,13 +30,25 @@ impl<T: Serialize> IntoResponse for Cbor<T> {
 mod target_validator;
 
 #[derive(Parser)]
-pub struct Server {
-  #[arg(long, help = "Listen on <ADDRESS> for incoming requests.")]
-  address: SocketAddr,
+pub(crate) struct Server {
+  #[arg(
+    long,
+    help = "Listen on <ADDRESS> for incoming requests.",
+    default_value = "::"
+  )]
+  address: IpAddr,
+  #[arg(
+    long,
+    help = "Listen on <PORT> for incoming HTTP requests.",
+    default_value = "80"
+  )]
+  http_port: u16,
   #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>", num_args = 0..)]
   packages: Vec<Utf8PathBuf>,
   #[arg(long, help = "Open server in browser.")]
   open: bool,
+  #[arg(long, help = "Bootstrap DHT node with <PEER>.", value_name = "<PEER>")]
+  bootstrap: Option<Peer>,
 }
 
 type HashPath = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>, String)>;
@@ -67,15 +79,19 @@ impl IntoResponse for Resource {
   }
 }
 
-#[derive(Debug, PartialEq)]
-pub enum ServerError {
+#[derive(Debug)]
+pub(crate) enum ServerError {
   NotFound { message: String },
+  Node { source: node::Error },
 }
 
 impl IntoResponse for ServerError {
   fn into_response(self) -> Response {
     match self {
       Self::NotFound { message } => (StatusCode::NOT_FOUND, message).into_response(),
+      Self::Node { source } => {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("{source:?}")).into_response()
+      }
     }
   }
 }
@@ -83,7 +99,7 @@ impl IntoResponse for ServerError {
 type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 impl Server {
-  pub fn run(self) -> Result {
+  pub(crate) fn run(self) -> Result {
     let mut library = Library::default();
 
     for path in &self.packages {
@@ -99,13 +115,34 @@ impl Server {
     let library = Arc::new(library);
 
     Runtime::new().context(error::Runtime)?.block_on(async {
-      axum_server::Server::bind(self.address)
+      let node = Arc::new(
+        Node::new(self.address, library.clone(), 0)
+          .await
+          .context(error::NodeInitialize)?,
+      );
+
+      let clone = node.clone();
+      tokio::spawn(async move {
+        if let Some(bootstrap) = self.bootstrap {
+          if let Err(err) = clone.ping(bootstrap).await {
+            eprintln!("update error: {err}");
+          }
+        }
+
+        if let Err(err) = clone.run().await {
+          eprintln!("node error: {err}");
+        }
+      });
+
+      axum_server::Server::bind((self.address, self.http_port).into())
         .serve(
           Router::new()
             .route("/", get(Self::root))
             .route("/favicon.ico", get(Self::favicon))
-            .route("/api/packages", get(Self::packages))
             .route("/api/handlers", get(Self::handlers))
+            .route("/api/node", get(Self::node))
+            .route("/api/packages", get(Self::packages))
+            .route("/api/search/:peer", get(Self::search))
             .route("/app/*path", get(Self::root_app))
             .route("/:app/:content/", get(Self::app_root))
             .route("/:app/:content/api/manifest", get(Self::manifest))
@@ -115,25 +152,26 @@ impl Server {
             .layer(SetRequestHeaderLayer::overriding(
               header::CONTENT_SECURITY_POLICY,
               move |request: &http::Request<Body>| {
-                Some(Self::content_security_policy(self.address, request.uri()))
+                Some(Self::content_security_policy(self.http_port, request.uri()))
               },
             ))
             .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
               library.clone(),
             )))
             .layer(Extension(library))
+            .layer(Extension(node))
             .into_make_service(),
         )
         .await
         .context(error::Serve {
-          address: self.address,
+          address: (self.address, self.http_port),
         })
     })?;
 
     Ok(())
   }
 
-  fn content_security_policy(address: SocketAddr, uri: &Uri) -> HeaderValue {
+  fn content_security_policy(port: u16, uri: &Uri) -> HeaderValue {
     static APP: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
     static ROOT: Lazy<Regex> = lazy_regex!("^/(app/.*)?$");
 
@@ -147,7 +185,7 @@ impl Server {
       .captures(path)
       .map(|captures| {
         HeaderValue::try_from(format!(
-          "default-src 'unsafe-eval' 'unsafe-inline' http://{address}/{}/{}/",
+          "default-src 'unsafe-eval' 'unsafe-inline' http://localhost:{port}/{}/{}/",
           &captures[1], &captures[2],
         ))
         .unwrap()
@@ -195,8 +233,45 @@ impl Server {
     )
   }
 
+  async fn search(
+    node: Extension<Arc<Node>>,
+    peer: Path<DeserializeFromStr<Id>>,
+  ) -> ServerResult<Cbor<Option<BTreeMap<Hash, Manifest>>>> {
+    let peer = **peer;
+
+    let hashes = node
+      .search(peer)
+      .await
+      .map_err(|source| ServerError::Node { source })?;
+
+    let Some(hashes) = hashes else {
+      return Ok(Cbor(None));
+    };
+
+    let mut manifests = BTreeMap::new();
+
+    for hash in hashes {
+      let manifest = node
+        .get(peer, hash)
+        .await
+        .map_err(|source| ServerError::Node { source })?;
+
+      let Some(manifest) = manifest else {
+        todo!();
+      };
+
+      manifests.insert(hash, manifest);
+    }
+
+    Ok(Cbor(Some(manifests)))
+  }
+
   async fn handlers(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Target, Hash>> {
     Cbor(library.handlers().clone())
+  }
+
+  async fn node(node: Extension<Arc<Node>>) -> Cbor<media::api::Node> {
+    Cbor(node.info().await)
   }
 
   async fn root_app(library: Extension<Arc<Library>>, path: Path<String>) -> ServerResult {
@@ -251,7 +326,7 @@ impl Server {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, std::net::Ipv4Addr};
 
   #[test]
   fn package_load_error() {
@@ -261,9 +336,11 @@ mod tests {
 
     assert_matches!(
       Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        packages: vec![package.clone()],
+        address: Ipv4Addr::new(0, 0, 0, 0).into(),
+        bootstrap: None,
+        http_port: 80,
         open: false,
+        packages: vec![package.clone()],
       }
       .run()
       .unwrap_err(),
@@ -359,31 +436,27 @@ mod tests {
       String::from_utf8_lossy(&page0.content),
     );
 
-    assert_eq!(
+    assert_matches!(
       Server::content(library.clone(), hash_path(app, comic, "foo".into()))
         .await
         .unwrap_err(),
-      ServerError::NotFound {
-        message: "/content/foo not found".into(),
-      },
+      ServerError::NotFound { message } if message == "/content/foo not found",
     );
 
-    assert_eq!(
+    assert_matches!(
       Server::app(library.clone(), hash_path(app, comic, "foo".into()))
         .await
         .unwrap_err(),
-      ServerError::NotFound {
-        message: "/app/foo not found".into(),
-      },
+      ServerError::NotFound { message } if message == "/app/foo not found",
     );
   }
 
   #[test]
   fn content_security_policy() {
-    let address = "0.0.0.0:80".parse().unwrap();
+    let port = 1234;
 
     assert_eq!(
-      Server::content_security_policy(address, &Uri::from_static("/")),
+      Server::content_security_policy(port, &Uri::from_static("/")),
       "default-src 'unsafe-eval' 'unsafe-inline' 'self'"
     );
 
@@ -391,12 +464,12 @@ mod tests {
     let content = PACKAGES.comic().hash;
 
     assert_eq!(
-      Server::content_security_policy(address, &format!("/{app}/{content}/").parse().unwrap()),
-      format!("default-src 'unsafe-eval' 'unsafe-inline' http://{address}/{app}/{content}/"),
+      Server::content_security_policy(port, &format!("/{app}/{content}/").parse().unwrap()),
+      format!("default-src 'unsafe-eval' 'unsafe-inline' http://localhost:{port}/{app}/{content}/"),
     );
 
     assert_eq!(
-      Server::content_security_policy(address, &"/foo".parse().unwrap()),
+      Server::content_security_policy(port, &"/foo".parse().unwrap()),
       "default-src",
     );
   }
