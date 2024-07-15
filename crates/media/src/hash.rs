@@ -4,7 +4,9 @@ use super::*;
 pub struct Hash(blake3::Hash);
 
 impl Hash {
-  pub fn as_bytes(&self) -> &[u8; 32] {
+  pub const LEN: usize = blake3::OUT_LEN;
+
+  pub fn as_bytes(&self) -> &[u8; Self::LEN] {
     self.0.as_bytes()
   }
 
@@ -40,9 +42,9 @@ impl Display for Hash {
   }
 }
 
-impl From<[u8; 32]> for Hash {
-  fn from(bytes: [u8; 32]) -> Self {
-    Self(bytes.into())
+impl From<[u8; Hash::LEN]> for Hash {
+  fn from(bytes: [u8; Hash::LEN]) -> Self {
+    Self(blake3::Hash::from(bytes))
   }
 }
 
@@ -60,7 +62,7 @@ impl<'de> Deserialize<'de> for Hash {
     D: serde::Deserializer<'de>,
   {
     Ok(Self(
-      serde_bytes::ByteArray::<32>::deserialize(deserializer)?
+      serde_bytes::ByteArray::<{ Hash::LEN }>::deserialize(deserializer)?
         .into_array()
         .into(),
     ))

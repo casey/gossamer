@@ -4,49 +4,25 @@
     <meta charset=utf-8>
     <link rel=stylesheet href=app/modern-normalize.css>
     <style>
-      body {
-        display: grid;
-        grid-template-columns: 1fr 3fr;
-        height: 100%;
-      }
-
-      button {
-        background: none!important;
-        border: none;
-        cursor: pointer;
-        padding: 0!important;
-      }
-
-      button:hover {
-        text-decoration: underline;
-      }
-
-      h1 {
-        margin-left: 1rem;
-      }
-
-      html {
-        height: 100%;
-      }
-
-      iframe {
-        border: 0;
-        border-left: 1px solid black;
-        height: 100%;
-        width: 100%;
-        display: block;
-      }
     </style>
   </head>
   <body>
     <nav>
+      <h1>System</h1>
+      <ul>
+        <li><button id=node>Node</button></li>
+      </ul>
+      <h1>Network</h1>
+      <ul>
+        <li><button id=search>Search</button></li>
+      </ul>
       <h1>Apps</h1>
       <ul>
 %% for (hash, manifest) in self.packages.iter().filter(|(hash, manifest)| manifest.ty() == Type::App) {
 %%   let ty = manifest.ty();
         <li>
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
-          <button data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
+          <button class=package data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
 %%   } else {
           {{ manifest.name }}
 %%   }
@@ -59,8 +35,8 @@
 %%   let ty = manifest.ty();
         <li>
 %%   if let Some(handler) = self.handlers.get(&ty.into()) {
-          <button data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
-%%   } else {
+          <button class=package data-handler={{handler}} data-package={{hash}}>{{ manifest.name }}</button>
+  %%   } else {
           {{ manifest.name }}
 %%   }
         </li>
@@ -69,6 +45,7 @@
     </nav>
     <main>
       <iframe></iframe>
+      <section></section>
     </main>
   </body>
 </html>

@@ -6,7 +6,9 @@ use {
     log,
     media::{Hash, Media, Target},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    wasm_bindgen_futures, Api, Component, Error,
+    wasm_bindgen_futures,
+    web_sys::{HtmlElement, ShadowRoot},
+    Api, Component, Error,
   },
   std::collections::BTreeMap,
 };

@@ -29,9 +29,12 @@ features = [
   "DocumentFragment",
   "DomParser",
   "Element",
+  "HtmlElement",
   "Location",
   "NodeList",
   "ShadowRoot",
+  "ShadowRootInit",
+  "ShadowRootMode",
   "SupportedType",
   "Window",
 ]

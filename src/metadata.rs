@@ -2,20 +2,20 @@ use super::*;
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub struct Metadata {
-  pub name: String,
-  pub media: Media,
+pub(crate) struct Metadata {
+  pub(crate) name: String,
+  pub(crate) media: Media,
 }
 
 impl Metadata {
-  pub const PATH: &'static str = "metadata.yaml";
+  pub(crate) const PATH: &'static str = "metadata.yaml";
 
-  pub fn load(path: &Utf8Path) -> Result<Self> {
+  pub(crate) fn load(path: &Utf8Path) -> Result<Self> {
     serde_yaml::from_reader(&File::open(path).context(error::Io { path })?)
       .context(error::DeserializeMetadata { path })
   }
 
-  pub fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
+  pub(crate) fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
     let media = match &self.media {
       Media::App { target } => {
         ensure!(
@@ -27,10 +27,10 @@ impl Metadata {
       Media::Comic => {
         let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();
 
-        let page_re = Regex::new(r"^(\d+)\.jpg$").unwrap();
+        static PAGE: Lazy<Regex> = lazy_regex!(r"^(\d+)\.jpg$");
 
         for path in paths {
-          let captures = page_re
+          let captures = PAGE
             .captures(path.as_ref())
             .context(error::UnexpectedFile {
               file: path.clone(),
@@ -70,13 +70,13 @@ impl Metadata {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
-pub enum Media {
+pub(crate) enum Media {
   App { target: Target },
   Comic,
 }
 
 impl Media {
-  pub fn ty(&self) -> Type {
+  pub(crate) fn ty(&self) -> Type {
     match self {
       Self::App { .. } => Type::App,
       Self::Comic => Type::Comic,

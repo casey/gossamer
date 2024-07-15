@@ -3,43 +3,54 @@ use super::*;
 pub trait Component: Display + Sized + 'static {
   fn name() -> &'static str;
 
-  async fn initialize() -> Result<Self, Error>;
+  async fn initialize(element: HtmlElement, shadow: ShadowRoot) -> Result<Self, Error>;
 
   fn define() {
     js::define(
       Self::name(),
-      &wasm_bindgen_futures::future_to_promise(Self::callback()),
+      &Closure::new(|element| Self::promise(element)),
     );
   }
 
-  async fn callback() -> Result<JsValue, JsValue> {
+  fn promise(element: HtmlElement) -> Promise {
+    wasm_bindgen_futures::future_to_promise(Self::callback(element))
+  }
+
+  async fn callback(element: HtmlElement) -> Result<JsValue, JsValue> {
+    let root = element
+      .attach_shadow(&ShadowRootInit::new(ShadowRootMode::Closed))
+      .unwrap();
+
     let parser = DomParser::new().unwrap();
 
-    let component = match Self::initialize().await {
+    let component = match Self::initialize(element, root.clone()).await {
       Ok(component) => component,
       Err(err) => {
-        log::error!("error initializing <{}>: {err}", Self::name());
+        let message = format!("error initializing <{}>: {err}", Self::name());
         let document = parser
           .parse_from_string(&Dialog(err).to_string(), SupportedType::TextHtml)
           .unwrap();
-        return Err(document.into());
+        root
+          .append_child(&document.document_element().unwrap())
+          .unwrap();
+        return Err(message.into());
       }
     };
 
     let html = component.to_string();
+
     let document = parser
       .parse_from_string(&html, SupportedType::TextHtml)
       .unwrap();
 
-    let callback = Closure::once(move |root| Self::connected(&Arc::new(component), root));
+    root
+      .append_child(&document.document_element().unwrap())
+      .unwrap();
 
-    let array = Array::new();
+    component.connected();
 
-    array.push(&document.into());
-    array.push(&callback.into_js_value());
-
-    Ok(array.into())
+    Ok(JsValue::UNDEFINED)
   }
 
-  fn connected(self: &Arc<Self>, _root: ShadowRoot) {}
+  fn connected(self) {}
 }

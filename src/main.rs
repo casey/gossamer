@@ -2,9 +2,10 @@
 
 use {
   self::{
-    deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, library::Library,
-    metadata::Metadata, package::Package, path_ext::PathExt, read_ext::ReadExt,
-    subcommand::Subcommand, template::Template, write_ext::WriteExt,
+    deserialize_from_str::DeserializeFromStr, distance::Distance, error::Error, into_u64::IntoU64,
+    library::Library, message::Message, metadata::Metadata, node::Node, package::Package,
+    path_ext::PathExt, read_ext::ReadExt, report::Report, subcommand::Subcommand,
+    template::Template, write_ext::WriteExt,
   },
   axum::{
     body::Body,
@@ -17,27 +18,43 @@ use {
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
   libc::EXIT_FAILURE,
-  media::{Cbor, Hash, Manifest, Media, Target, Type},
+  media::{FromCbor, Hash, Manifest, Media, Peer, Target, ToCbor, Type},
   mime_guess::{mime, Mime},
+  quinn::{Connection, Endpoint, Incoming, RecvStream, SendStream},
+  rand::Rng,
   regex::Regex,
   regex_static::{lazy_regex, once_cell::sync::Lazy},
   serde::{Deserialize, Deserializer, Serialize},
   snafu::{ensure, ErrorCompat, OptionExt, ResultExt, Snafu},
   std::{
+    any::Any,
     backtrace::{Backtrace, BacktraceStatus},
-    collections::{BTreeMap, HashMap, HashSet},
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet},
     fmt::Display,
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
-    net::SocketAddr,
+    iter,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     num::{ParseIntError, TryFromIntError},
+    ops::{Deref, DerefMut},
     path::PathBuf,
     process, str,
     str::FromStr,
-    sync::Arc,
+    sync::{
+      atomic::{self, AtomicU64},
+      Arc, Mutex,
+    },
+    time::Duration,
   },
+  strum::IntoStaticStr,
+  tokio::sync::RwLock,
   walkdir::WalkDir,
 };
+
+// Maximum size of each routing table bucket, as well as the maximum number of
+// nodes returned from FIND_NODE and FIND_VALUE query.
+const K: usize = 20;
 
 #[cfg(test)]
 #[macro_use]
@@ -47,13 +64,18 @@ mod test;
 use test::*;
 
 mod deserialize_from_str;
+mod distance;
 mod error;
 mod into_u64;
 mod library;
+mod message;
 mod metadata;
+mod node;
 mod package;
+mod passthrough;
 mod path_ext;
 mod read_ext;
+mod report;
 mod subcommand;
 mod template;
 mod write_ext;

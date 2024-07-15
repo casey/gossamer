@@ -1,5 +1,6 @@
 use super::*;
 
+#[derive(Clone, Debug)]
 pub struct Api {
   base: Url,
 }
@@ -25,6 +26,26 @@ impl Api {
 
   pub async fn handlers(&self) -> Result<BTreeMap<Target, Hash>, Error> {
     self.get("api/handlers").await
+  }
+
+  pub async fn node(&self) -> Result<media::api::Node, Error> {
+    self.get("api/node").await
+  }
+
+  pub async fn search(&self, hash: Hash) -> Result<Option<BTreeMap<Hash, Manifest>>, Error> {
+    self.get(&format!("api/search/{hash}")).await
+  }
+
+  pub async fn find(&self, hash: Hash) -> Result<Option<Peer>, Error> {
+    self.get(&format!("api/find/{hash}")).await
+  }
+
+  pub async fn bookmark(&self, peer: Hash) -> Result<(), Error> {
+    self.get(&format!("api/bookmark/{peer}")).await
+  }
+
+  pub async fn bookmarks(&self) -> Result<BTreeSet<Hash>, Error> {
+    self.get(&format!("api/bookmarks")).await
   }
 
   async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, Error> {

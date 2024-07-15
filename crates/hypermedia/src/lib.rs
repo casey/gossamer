@@ -4,29 +4,41 @@ use {
   self::dialog::Dialog,
   boilerplate::Boilerplate,
   html_escaper::Escape,
-  js_sys::{Array, Promise},
-  media::{Hash, Manifest, Target, Type},
+  js_sys::Promise,
+  media::{Hash, Manifest, Peer, Target, Type},
   reqwest::{StatusCode, Url},
   serde::de::DeserializeOwned,
   snafu::{ensure, ResultExt, Snafu},
   std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::Display,
     io::{self, Cursor},
     ops::Deref,
-    sync::Arc,
   },
-  wasm_bindgen::{closure::Closure, convert::FromWasmAbi, JsCast, JsError, JsValue},
-  web_sys::{DocumentFragment, DomParser, EventTarget, ShadowRoot, SupportedType},
+  wasm_bindgen::{
+    closure::Closure,
+    convert::{FromWasmAbi, IntoWasmAbi},
+    JsCast, JsError, JsValue,
+  },
+  web_sys::{
+    DocumentFragment, DomParser, Element, EventTarget, HtmlElement, ShadowRoot, ShadowRootInit,
+    ShadowRootMode, SupportedType,
+  },
 };
 
 pub use {
   self::{
-    api::Api, cast::Cast, component::Component, error::Error, event_target_ext::EventTargetExt,
-    select::Select,
+    api::Api,
+    cast::Cast,
+    component::Component,
+    error::Error,
+    event_target_ext::EventTargetExt,
+    select::{SelectDocumentFragment, SelectElement},
   },
   boilerplate, html_escaper, js_sys, log, media, wasm_bindgen, wasm_bindgen_futures, web_sys,
 };
+
+type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 mod api;
 mod cast;

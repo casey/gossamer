@@ -1,6 +1,6 @@
 use super::*;
 
-pub trait WriteExt {
+pub(crate) trait WriteExt {
   fn write_hash(&mut self, value: Hash) -> io::Result<()>;
 
   fn write_u64(&mut self, value: u64) -> io::Result<()>;

@@ -1,15 +1,15 @@
 use super::*;
 
 #[derive(Parser)]
-pub struct Package {
+pub(crate) struct Package {
   #[arg(long, help = "Package contents of directory <ROOT>.")]
-  pub root: Utf8PathBuf,
+  pub(crate) root: Utf8PathBuf,
   #[arg(long, help = "Save package to <OUTPUT>.")]
-  pub output: Utf8PathBuf,
+  pub(crate) output: Utf8PathBuf,
 }
 
 impl Package {
-  pub fn run(self) -> Result {
+  pub(crate) fn run(self) -> Result {
     ensure!(
       !self.output.starts_with(&self.root),
       error::OutputInRoot {
