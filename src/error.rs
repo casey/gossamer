@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(false)), visibility(pub))]
-pub enum Error {
+pub(crate) enum Error {
   #[snafu(display("app package must be of type `app` not `{ty}`"))]
   AppType {
     backtrace: Option<Backtrace>,
@@ -118,7 +118,7 @@ pub enum Error {
 }
 
 impl Error {
-  pub fn report(&self) {
+  pub(crate) fn report(&self) {
     eprintln!("error: {self}");
 
     for (i, err) in self.iter_chain().skip(1).enumerate() {

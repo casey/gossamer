@@ -1,0 +1,40 @@
+<h1>Node</h1>
+
+{{self.0.id}}@{{self.0.address}}:{{self.0.port}}
+
+<h2>Statistics</h2>
+
+<h3>Sent</h3>
+
+{{ self.0.sent }}
+
+<h3>Received</h3>
+
+{{ self.0.received }}
+
+<h2>Routing Table</h2>
+
+<ol>
+%% for (i, bucket) in self.0.routing_table.iter().enumerate() {
+%%   if !bucket.is_empty() {
+  <li value={{i}}>
+%%    for contact in bucket {
+    <span>{{ contact }}</span>
+%%    }
+  </li>
+%%   }
+%% }
+</ol>
+
+<h2>Directory</h2>
+
+<ul>
+%% for (hash, contacts) in &self.0.directory {
+  <li>
+    <label>{{ hash }}</label>
+%%   for contact in contacts {
+    <span>{{ contact }}</span>
+%%   }
+  </li>
+%% }
+</ul>

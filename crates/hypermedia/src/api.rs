@@ -27,6 +27,10 @@ impl Api {
     self.get("api/handlers").await
   }
 
+  pub async fn node(&self) -> Result<media::api::Node, Error> {
+    self.get("api/node").await
+  }
+
   async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, Error> {
     let url = self.base.join(path).unwrap();
 

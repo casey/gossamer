@@ -15,4 +15,5 @@ features = [
   "PointerEvent",
   "HtmlButtonElement",
   "HtmlIFrameElement",
+  "CssStyleDeclaration",
 ]

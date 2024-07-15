@@ -1,12 +1,12 @@
 use super::*;
 
-pub use {std::fs, tempfile::TempDir};
+pub(crate) use {std::fs, tempfile::TempDir};
 
-pub fn tempdir() -> TempDir {
+pub(crate) fn tempdir() -> TempDir {
   tempfile::tempdir().unwrap()
 }
 
-pub trait TempDirExt {
+pub(crate) trait TempDirExt {
   fn path_utf8(&self) -> &Utf8Path;
 
   fn touch(&self, path: impl AsRef<Utf8Path>) {
@@ -49,7 +49,7 @@ macro_rules! assert_matches {
   }
 }
 
-pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
+pub(crate) static PACKAGES: Lazy<Packages> = Lazy::new(|| {
   let dir = tempdir();
 
   let app = dir.join("app.package");
@@ -87,7 +87,7 @@ pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
   }
 });
 
-pub struct Packages {
+pub(crate) struct Packages {
   root: Package,
   app: Package,
   comic: Package,
@@ -96,15 +96,15 @@ pub struct Packages {
 }
 
 impl Packages {
-  pub fn app(&self) -> &Package {
+  pub(crate) fn app(&self) -> &Package {
     &self.app
   }
 
-  pub fn root(&self) -> &Package {
+  pub(crate) fn root(&self) -> &Package {
     &self.root
   }
 
-  pub fn comic(&self) -> &Package {
+  pub(crate) fn comic(&self) -> &Package {
     &self.comic
   }
 }

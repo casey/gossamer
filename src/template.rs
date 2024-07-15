@@ -1,17 +1,17 @@
 use super::*;
 
-pub struct Template {
-  pub name: String,
-  pub media: Media,
+pub(crate) struct Template {
+  pub(crate) name: String,
+  pub(crate) media: Media,
 }
 
-pub enum Media {
+pub(crate) enum Media {
   App { target: Target },
   Comic { pages: Vec<Utf8PathBuf> },
 }
 
 impl Template {
-  pub fn manifest(self, hashes: &HashMap<Utf8PathBuf, (Hash, u64)>) -> Manifest {
+  pub(crate) fn manifest(self, hashes: &HashMap<Utf8PathBuf, (Hash, u64)>) -> Manifest {
     let media = match self.media {
       Media::App { target } => {
         let mut paths = BTreeMap::new();

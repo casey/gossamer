@@ -13,7 +13,7 @@ impl Component for App {
     "media-app"
   }
 
-  async fn initialize() -> Result<Self, Error> {
+  async fn initialize(_element: HtmlElement, _root: ShadowRoot) -> Result<Self, Error> {
     let api = Api::default();
 
     let manifest = api.manifest().await?;

@@ -30,13 +30,21 @@ impl<T: Serialize> IntoResponse for Cbor<T> {
 mod target_validator;
 
 #[derive(Parser)]
-pub struct Server {
+pub(crate) struct Server {
   #[arg(long, help = "Listen on <ADDRESS> for incoming requests.")]
-  address: SocketAddr,
+  address: IpAddr,
+  #[arg(long, help = "Listen on <PORT> for incoming requests.")]
+  http_port: u16,
   #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>", num_args = 0..)]
   packages: Vec<Utf8PathBuf>,
   #[arg(long, help = "Open server in browser.")]
   open: bool,
+  #[arg(
+    long,
+    help = "Bootstrap DHT node with <CONTACT>.",
+    value_name = "<CONTACT>"
+  )]
+  bootstrap: Option<Contact>,
 }
 
 type HashPath = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>, String)>;
@@ -68,7 +76,7 @@ impl IntoResponse for Resource {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ServerError {
+pub(crate) enum ServerError {
   NotFound { message: String },
 }
 
@@ -83,7 +91,7 @@ impl IntoResponse for ServerError {
 type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 impl Server {
-  pub fn run(self) -> Result {
+  pub(crate) fn run(self) -> Result {
     let mut library = Library::default();
 
     for path in &self.packages {
@@ -99,13 +107,24 @@ impl Server {
     let library = Arc::new(library);
 
     Runtime::new().context(error::Runtime)?.block_on(async {
-      axum_server::Server::bind(self.address)
+      let node = Arc::new(Node::new(self.address, 0).await.unwrap());
+
+      let clone = node.clone();
+
+      tokio::spawn(async move { clone.run(self.bootstrap).await });
+
+      for hash in library.packages().keys() {
+        node.store(*hash).await.unwrap();
+      }
+
+      axum_server::Server::bind((self.address, self.http_port).into())
         .serve(
           Router::new()
             .route("/", get(Self::root))
             .route("/favicon.ico", get(Self::favicon))
             .route("/api/packages", get(Self::packages))
             .route("/api/handlers", get(Self::handlers))
+            .route("/api/node", get(Self::node))
             .route("/app/*path", get(Self::root_app))
             .route("/:app/:content/", get(Self::app_root))
             .route("/:app/:content/api/manifest", get(Self::manifest))
@@ -115,25 +134,30 @@ impl Server {
             .layer(SetRequestHeaderLayer::overriding(
               header::CONTENT_SECURITY_POLICY,
               move |request: &http::Request<Body>| {
-                Some(Self::content_security_policy(self.address, request.uri()))
+                Some(Self::content_security_policy(
+                  self.address,
+                  self.http_port,
+                  request.uri(),
+                ))
               },
             ))
             .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
               library.clone(),
             )))
             .layer(Extension(library))
+            .layer(Extension(node))
             .into_make_service(),
         )
         .await
         .context(error::Serve {
-          address: self.address,
+          address: (self.address, self.http_port),
         })
     })?;
 
     Ok(())
   }
 
-  fn content_security_policy(address: SocketAddr, uri: &Uri) -> HeaderValue {
+  fn content_security_policy(address: IpAddr, port: u16, uri: &Uri) -> HeaderValue {
     static APP: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
     static ROOT: Lazy<Regex> = lazy_regex!("^/(app/.*)?$");
 
@@ -147,7 +171,7 @@ impl Server {
       .captures(path)
       .map(|captures| {
         HeaderValue::try_from(format!(
-          "default-src 'unsafe-eval' 'unsafe-inline' http://{address}/{}/{}/",
+          "default-src 'unsafe-eval' 'unsafe-inline' http://{address}:{port}/{}/{}/",
           &captures[1], &captures[2],
         ))
         .unwrap()
@@ -197,6 +221,18 @@ impl Server {
 
   async fn handlers(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Target, Hash>> {
     Cbor(library.handlers().clone())
+  }
+
+  async fn node(node: Extension<Arc<Node>>) -> Cbor<media::api::Node> {
+    Cbor(media::api::Node {
+      address: node.address,
+      directory: node.directory.read().await.clone(),
+      id: node.id,
+      port: node.port,
+      received: node.received.load(atomic::Ordering::Relaxed),
+      routing_table: node.routing_table.read().await.clone(),
+      sent: node.sent.load(atomic::Ordering::Relaxed),
+    })
   }
 
   async fn root_app(library: Extension<Arc<Library>>, path: Path<String>) -> ServerResult {
@@ -251,7 +287,7 @@ impl Server {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+  use {super::*, std::net::Ipv4Addr};
 
   #[test]
   fn package_load_error() {
@@ -261,9 +297,11 @@ mod tests {
 
     assert_matches!(
       Server {
-        address: "0.0.0.0:80".parse().unwrap(),
-        packages: vec![package.clone()],
+        address: Ipv4Addr::new(0, 0, 0, 0).into(),
+        bootstrap: None,
+        http_port: 80,
         open: false,
+        packages: vec![package.clone()],
       }
       .run()
       .unwrap_err(),
@@ -380,10 +418,11 @@ mod tests {
 
   #[test]
   fn content_security_policy() {
-    let address = "0.0.0.0:80".parse().unwrap();
+    let address = "0.0.0.0".parse().unwrap();
+    let port = 1234;
 
     assert_eq!(
-      Server::content_security_policy(address, &Uri::from_static("/")),
+      Server::content_security_policy(address, port, &Uri::from_static("/")),
       "default-src 'unsafe-eval' 'unsafe-inline' 'self'"
     );
 
@@ -391,12 +430,16 @@ mod tests {
     let content = PACKAGES.comic().hash;
 
     assert_eq!(
-      Server::content_security_policy(address, &format!("/{app}/{content}/").parse().unwrap()),
-      format!("default-src 'unsafe-eval' 'unsafe-inline' http://{address}/{app}/{content}/"),
+      Server::content_security_policy(
+        address,
+        port,
+        &format!("/{app}/{content}/").parse().unwrap()
+      ),
+      format!("default-src 'unsafe-eval' 'unsafe-inline' http://{address}:{port}/{app}/{content}/"),
     );
 
     assert_eq!(
-      Server::content_security_policy(address, &"/foo".parse().unwrap()),
+      Server::content_security_policy(address, port, &"/foo".parse().unwrap()),
       "default-src",
     );
   }
