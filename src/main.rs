@@ -33,7 +33,7 @@ use {
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
     iter,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv6Addr, SocketAddr},
     num::{ParseIntError, TryFromIntError},
     path::PathBuf,
     process, str,
@@ -47,10 +47,9 @@ use {
   walkdir::WalkDir,
 };
 
-// Maximum UDP packet size deliverable without fragmentation.
-//
-// Equal to `MIN_MTU - MAX_IP_HEADER - MAX_UDP_HEADER`.
-const MAX_UDP_PAYLOAD: usize = 508 - 60 - 8;
+// Maximum size of each routing table bucket, as well as the maximum number of
+// nodes returned from FIND_NODE and FIND_VALUE query.
+const K: usize = 20;
 
 #[cfg(test)]
 #[macro_use]

@@ -1,14 +1,10 @@
 use super::*;
 
-// Number of buckets a in node's routing table. For each bucket with position
+// Number of buckets in a node's routing table. For each bucket with position
 // `i` in the routing table, we store nodes at distance `i` from ourselves.
 // Note that this include nodes who have the same ID as our own, which reside
 // at distance 0,
 const BUCKETS: usize = 257;
-
-// Maximum size of each routing table bucket, as well as the maximum number of
-// nodes returned from FIND_NODE and FIND_VALUE query.
-const K: usize = 20;
 
 pub(crate) struct Node {
   pub(crate) address: IpAddr,
@@ -78,7 +74,7 @@ impl Node {
     }
     .to_cbor();
 
-    assert!(message.len() <= MAX_UDP_PAYLOAD);
+    assert!(message.len() <= Message::MAX_SIZE);
 
     let sent = self
       .socket
@@ -93,7 +89,7 @@ impl Node {
   }
 
   async fn receive(&self) -> io::Result<()> {
-    let mut buffer = [0; MAX_UDP_PAYLOAD];
+    let mut buffer = [0; Message::MAX_SIZE];
 
     let (received, from) = self.socket.recv_from(&mut buffer).await?;
 
@@ -110,6 +106,14 @@ impl Node {
     self.received.fetch_add(1, atomic::Ordering::Relaxed);
 
     match message.payload {
+      Payload::FindNode(hash) => {
+        self
+          .send(contact, Payload::Nodes(self.routes(hash).await))
+          .await?
+      }
+      Payload::Nodes(nodes) => {
+        todo!()
+      }
       Payload::Ping => self.send(contact, Payload::Pong).await?,
       Payload::Pong => {}
       Payload::Store(hash) => {
