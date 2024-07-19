@@ -115,11 +115,19 @@ impl Server {
     let library = Arc::new(library);
 
     Runtime::new().context(error::Runtime)?.block_on(async {
-      let node = Arc::new(Node::new(self.address, 0).await.unwrap());
+      let node = Arc::new(
+        Node::new(self.address, 0)
+          .await
+          .context(error::NodeInitialize)?,
+      );
 
       let clone = node.clone();
 
-      tokio::spawn(async move { clone.run(self.bootstrap).await });
+      tokio::spawn(async move {
+        if let Err(err) = clone.run(self.bootstrap).await {
+          eprintln!("node error: {err}");
+        }
+      });
 
       // for hash in library.packages().keys() {
       //   node.store(*hash).await.unwrap();

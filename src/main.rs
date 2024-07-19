@@ -34,7 +34,7 @@ use {
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
     iter,
-    net::{IpAddr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, SocketAddr},
     num::{ParseIntError, TryFromIntError},
     path::PathBuf,
     process, str,
@@ -44,7 +44,7 @@ use {
       Arc,
     },
   },
-  tokio::{net::UdpSocket, sync::RwLock},
+  tokio::sync::RwLock,
   walkdir::WalkDir,
 };
 

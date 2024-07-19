@@ -41,6 +41,11 @@ pub(crate) enum Error {
     backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
   },
+  #[snafu(display("failed to initialize node"))]
+  NodeInitialize {
+    backtrace: Option<Backtrace>,
+    source: node::Error,
+  },
   #[snafu(display("comic package in `{root}` contains no pages"))]
   NoPages {
     backtrace: Option<Backtrace>,

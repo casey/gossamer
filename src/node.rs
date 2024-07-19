@@ -17,13 +17,48 @@ pub(crate) struct Node {
   pub(crate) sent: AtomicU64,
 }
 
+#[derive(Debug, Snafu)]
+#[snafu(context(suffix(Error)))]
+pub(crate) enum Error {
+  Accept {
+    backtrace: Option<Backtrace>,
+    source: quinn::ConnectionError,
+  },
+  Connect {
+    backtrace: Option<Backtrace>,
+    source: quinn::ConnectError,
+  },
+  Connection {
+    backtrace: Option<Backtrace>,
+    source: quinn::ConnectionError,
+  },
+  DeserializeError {
+    backtrace: Option<Backtrace>,
+    source: ciborium::de::Error<io::Error>,
+  },
+  LocalAddress {
+    backtrace: Option<Backtrace>,
+    source: io::Error,
+  },
+  Read {
+    backtrace: Option<Backtrace>,
+    source: quinn::ReadExactError,
+  },
+  Write {
+    backtrace: Option<Backtrace>,
+    source: quinn::WriteError,
+  },
+}
+
+type Result<T = (), E = Error> = std::result::Result<T, E>;
+
 impl Node {
-  pub(crate) async fn new(address: IpAddr, port: u16) -> io::Result<Self> {
-    let socket = UdpSocket::bind((address, port)).await?;
-    let socket_address = socket.local_addr()?;
+  pub(crate) async fn new(address: IpAddr, port: u16) -> Result<Self> {
     let mut rng = rand::thread_rng();
 
     let endpoint = UnverifiedEndpoint::new(address, port);
+
+    let socket_address = endpoint.local_addr().context(LocalAddressError)?;
 
     Ok(Self {
       address: socket_address.ip(),
@@ -37,45 +72,57 @@ impl Node {
     })
   }
 
-  pub(crate) async fn run(self: Arc<Self>, bootstrap: Option<Contact>) -> io::Result<()> {
+  pub(crate) async fn run(self: Arc<Self>, bootstrap: Option<Contact>) -> Result {
     if let Some(bootstrap) = bootstrap {
       self.ping(bootstrap).await?;
     }
 
-    loop {
-      tokio::spawn(self.clone().accept(self.endpoint.accept().await.unwrap()));
-      // eprintln!("DHT node error: {err}");
+    while let Some(incoming) = self.endpoint.accept().await {
+      let clone = self.clone();
+      tokio::spawn(async move {
+        if let Err(err) = clone.accept(incoming).await {
+          eprintln!("error: {err}");
+        }
+      });
     }
+
+    Ok(())
   }
 
-  async fn accept(self: Arc<Self>, incoming: Incoming) {
-    let connection = incoming.accept().unwrap().await.unwrap();
+  async fn accept(self: Arc<Self>, incoming: Incoming) -> Result {
+    let connection = incoming
+      .accept()
+      .context(AcceptError)?
+      .await
+      .context(AcceptError)?;
 
     let from = connection.remote_address();
 
-    let (tx, mut rx) = connection.accept_bi().await.unwrap();
+    let (tx, rx) = connection.accept_bi().await.context(AcceptError)?;
 
-    let message = self.receive(rx).await;
+    let message = self.receive(rx).await?;
 
-    let contact = Contact {
+    let from = Contact {
       address: from.ip(),
       id: message.from,
       port: from.port(),
     };
 
-    self.update(contact).await;
+    self.update(from).await;
 
     self.received.fetch_add(1, atomic::Ordering::Relaxed);
 
     match message.payload {
-      Payload::FindNode(hash) => self
-        .send(tx, Payload::Nodes(self.routes(hash).await))
-        .await
-        .unwrap(),
+      Payload::FindNode(hash) => {
+        self
+          .send(tx, Payload::Nodes(self.routes(hash).await))
+          .await?
+      }
+
       Payload::Nodes(nodes) => {
         todo!()
       }
-      Payload::Ping => self.send(tx, Payload::Pong).await.unwrap(),
+      Payload::Ping => self.send(tx, Payload::Pong).await?,
       Payload::Pong => {}
       Payload::Store(hash) => {
         self
@@ -84,37 +131,37 @@ impl Node {
           .await
           .entry(hash)
           .or_default()
-          .insert(contact);
+          .insert(from);
       }
     }
+
+    Ok(())
   }
 
-  async fn send(&self, mut stream: SendStream, payload: Payload) -> io::Result<()> {
+  async fn send(&self, mut stream: SendStream, payload: Payload) -> Result {
     let message = Message {
       payload,
       from: self.id,
     }
     .to_cbor();
 
-    stream.write_all(&message).await.unwrap();
+    stream.write_all(&message).await.context(WriteError)?;
 
     self.sent.fetch_add(1, atomic::Ordering::Relaxed);
 
     Ok(())
   }
 
-  async fn receive(&self, mut rx: RecvStream) -> Message {
+  async fn receive(&self, mut rx: RecvStream) -> Result<Message> {
     let mut buffer = [0; u16::MAX as usize];
 
-    rx.read_exact(&mut buffer[..2]).await.unwrap();
+    rx.read_exact(&mut buffer[..2]).await.context(ReadError)?;
 
-    let len = u16::from_le_bytes(buffer[..2].try_into().unwrap()) as usize;
+    let len = u16::from_le_bytes([buffer[0], buffer[1]]) as usize;
 
-    rx.read_exact(&mut buffer[..len]).await.unwrap();
+    rx.read_exact(&mut buffer[..len]).await.context(ReadError)?;
 
-    let message = Message::from_cbor(&buffer[0..len]).unwrap();
-
-    message
+    Message::from_cbor(&buffer[0..len]).context(DeserializeError)
   }
 
   // pub(crate) async fn store(&self, hash: Hash) -> io::Result<()> {
@@ -124,21 +171,21 @@ impl Node {
   //   Ok(())
   // }
 
-  async fn ping(&self, contact: Contact) -> io::Result<()> {
-    let (tx, rx) = self
+  async fn ping(&self, contact: Contact) -> Result {
+    let (tx, _rx) = self
       .endpoint
       .connect(
         (contact.address, contact.port).into(),
         UnverifiedEndpoint::SERVER_NAME,
       )
-      .unwrap()
+      .context(ConnectError)?
       .await
-      .unwrap()
+      .context(ConnectionError)?
       .open_bi()
       .await
-      .unwrap();
+      .context(ConnectionError)?;
 
-    self.send(tx, Payload::Ping).await;
+    self.send(tx, Payload::Ping).await?;
 
     Ok(())
   }
