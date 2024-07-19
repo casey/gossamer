@@ -31,9 +31,17 @@ mod target_validator;
 
 #[derive(Parser)]
 pub(crate) struct Server {
-  #[arg(long, help = "Listen on <ADDRESS> for incoming requests.")]
+  #[arg(
+    long,
+    help = "Listen on <ADDRESS> for incoming requests.",
+    default_value = "::"
+  )]
   address: IpAddr,
-  #[arg(long, help = "Listen on <PORT> for incoming requests.")]
+  #[arg(
+    long,
+    help = "Listen on <PORT> for incoming requests.",
+    default_value = "80"
+  )]
   http_port: u16,
   #[arg(long, help = "Load <PACKAGE> into library.", value_name = "<PACKAGE>", num_args = 0..)]
   packages: Vec<Utf8PathBuf>,
@@ -113,9 +121,9 @@ impl Server {
 
       tokio::spawn(async move { clone.run(self.bootstrap).await });
 
-      for hash in library.packages().keys() {
-        node.store(*hash).await.unwrap();
-      }
+      // for hash in library.packages().keys() {
+      //   node.store(*hash).await.unwrap();
+      // }
 
       axum_server::Server::bind((self.address, self.http_port).into())
         .serve(
@@ -134,11 +142,7 @@ impl Server {
             .layer(SetRequestHeaderLayer::overriding(
               header::CONTENT_SECURITY_POLICY,
               move |request: &http::Request<Body>| {
-                Some(Self::content_security_policy(
-                  self.address,
-                  self.http_port,
-                  request.uri(),
-                ))
+                Some(Self::content_security_policy(self.http_port, request.uri()))
               },
             ))
             .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
@@ -157,7 +161,7 @@ impl Server {
     Ok(())
   }
 
-  fn content_security_policy(address: IpAddr, port: u16, uri: &Uri) -> HeaderValue {
+  fn content_security_policy(port: u16, uri: &Uri) -> HeaderValue {
     static APP: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
     static ROOT: Lazy<Regex> = lazy_regex!("^/(app/.*)?$");
 
@@ -171,7 +175,7 @@ impl Server {
       .captures(path)
       .map(|captures| {
         HeaderValue::try_from(format!(
-          "default-src 'unsafe-eval' 'unsafe-inline' http://{address}:{port}/{}/{}/",
+          "default-src 'unsafe-eval' 'unsafe-inline' http://localhost:{port}/{}/{}/",
           &captures[1], &captures[2],
         ))
         .unwrap()
@@ -418,11 +422,10 @@ mod tests {
 
   #[test]
   fn content_security_policy() {
-    let address = "0.0.0.0".parse().unwrap();
     let port = 1234;
 
     assert_eq!(
-      Server::content_security_policy(address, port, &Uri::from_static("/")),
+      Server::content_security_policy(port, &Uri::from_static("/")),
       "default-src 'unsafe-eval' 'unsafe-inline' 'self'"
     );
 
@@ -430,16 +433,12 @@ mod tests {
     let content = PACKAGES.comic().hash;
 
     assert_eq!(
-      Server::content_security_policy(
-        address,
-        port,
-        &format!("/{app}/{content}/").parse().unwrap()
-      ),
-      format!("default-src 'unsafe-eval' 'unsafe-inline' http://{address}:{port}/{app}/{content}/"),
+      Server::content_security_policy(port, &format!("/{app}/{content}/").parse().unwrap()),
+      format!("default-src 'unsafe-eval' 'unsafe-inline' http://localhost:{port}/{app}/{content}/"),
     );
 
     assert_eq!(
-      Server::content_security_policy(address, port, &"/foo".parse().unwrap()),
+      Server::content_security_policy(port, &"/foo".parse().unwrap()),
       "default-src",
     );
   }

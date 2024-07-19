@@ -25,14 +25,12 @@ clean:
   rm -rf build
 
 open:
-  open http://127.0.0.1:8000
+  open http://localhost
 
 serve: build (package 'app-viewer') (package 'comic-viewer') (package 'library-viewer')
   mkdir -p target/packages
   target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
   target/debug/gossamer server \
-    --address 127.0.0.1 \
-    --http-port 8000 \
     --packages \
       build/app-viewer.package \
       build/comic-viewer.package \

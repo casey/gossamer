@@ -5,7 +5,7 @@ use {
     deserialize_from_str::DeserializeFromStr, distance::Distance, error::Error, into_u64::IntoU64,
     library::Library, message::Message, metadata::Metadata, node::Node, package::Package,
     path_ext::PathExt, payload::Payload, read_ext::ReadExt, subcommand::Subcommand,
-    template::Template, write_ext::WriteExt,
+    template::Template, unverified_endpoint::UnverifiedEndpoint, write_ext::WriteExt,
   },
   axum::{
     body::Body,
@@ -20,6 +20,7 @@ use {
   libc::EXIT_FAILURE,
   media::{Cbor, Contact, Hash, Manifest, Media, Target, Type},
   mime_guess::{mime, Mime},
+  quinn::{Endpoint, Incoming, RecvStream, SendStream},
   rand::Rng,
   regex::Regex,
   regex_static::{lazy_regex, once_cell::sync::Lazy},
@@ -72,6 +73,7 @@ mod payload;
 mod read_ext;
 mod subcommand;
 mod template;
+mod unverified_endpoint;
 mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
