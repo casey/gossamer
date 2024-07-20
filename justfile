@@ -31,6 +31,8 @@ serve: build (package 'app-viewer') (package 'comic-viewer') (package 'library-v
   mkdir -p target/packages
   target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
   target/debug/gossamer server \
+    --http-port 8000 \
+    --bootstrap bbcf952cc0cdb0f564cd8115072413ff09c2d08b3ed91fd1ce9cf982c15ee7ae@127.0.0.1:57642 \
     --packages \
       build/app-viewer.package \
       build/comic-viewer.package \

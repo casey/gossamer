@@ -237,10 +237,8 @@ impl Server {
 
   async fn node(node: Extension<Arc<Node>>) -> Cbor<media::api::Node> {
     Cbor(media::api::Node {
-      address: node.address,
+      contact: node.contact,
       directory: node.directory.read().await.clone(),
-      id: node.id,
-      port: node.port,
       received: node.received.load(atomic::Ordering::Relaxed),
       routing_table: node.routing_table.read().await.clone(),
       sent: node.sent.load(atomic::Ordering::Relaxed),

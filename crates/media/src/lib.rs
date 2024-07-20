@@ -6,7 +6,7 @@ use {
     collections::{BTreeMap, HashMap, HashSet},
     fmt::{self, Display, Formatter},
     io::{self, Cursor, Read},
-    net::IpAddr,
+    net::{IpAddr, SocketAddr},
     str::FromStr,
   },
   strum::IntoStaticStr,

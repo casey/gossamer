@@ -121,26 +121,3 @@ pub(crate) enum Error {
     source: walkdir::Error,
   },
 }
-
-impl Error {
-  pub(crate) fn report(&self) {
-    eprintln!("error: {self}");
-
-    for (i, err) in self.iter_chain().skip(1).enumerate() {
-      if i == 0 {
-        eprintln!();
-        eprintln!("because:");
-      }
-
-      eprintln!("- {err}");
-    }
-
-    if let Some(backtrace) = self.backtrace() {
-      if backtrace.status() == BacktraceStatus::Captured {
-        eprintln!();
-        eprintln!("backtrace:");
-        eprintln!("{backtrace}");
-      }
-    }
-  }
-}

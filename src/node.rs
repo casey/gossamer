@@ -7,11 +7,9 @@ use super::*;
 const BUCKETS: usize = 257;
 
 pub(crate) struct Node {
-  pub(crate) address: IpAddr,
+  pub(crate) contact: Contact,
   pub(crate) directory: RwLock<HashMap<Hash, HashSet<Contact>>>,
   pub(crate) endpoint: Endpoint,
-  pub(crate) id: Hash,
-  pub(crate) port: u16,
   pub(crate) received: AtomicU64,
   pub(crate) routing_table: RwLock<Vec<Vec<Contact>>>,
   pub(crate) sent: AtomicU64,
@@ -61,11 +59,13 @@ impl Node {
     let socket_address = endpoint.local_addr().context(LocalAddressError)?;
 
     Ok(Self {
-      address: socket_address.ip(),
+      contact: Contact {
+        address: socket_address.ip(),
+        port: socket_address.port(),
+        id: Hash::from(std::array::from_fn(|_| rng.gen())),
+      },
       directory: RwLock::default(),
       endpoint,
-      id: Hash::from(std::array::from_fn(|_| rng.gen())),
-      port: socket_address.port(),
       received: AtomicU64::default(),
       routing_table: RwLock::new((0..=BUCKETS).map(|_| Default::default()).collect()),
       sent: AtomicU64::default(),
@@ -74,14 +74,16 @@ impl Node {
 
   pub(crate) async fn run(self: Arc<Self>, bootstrap: Option<Contact>) -> Result {
     if let Some(bootstrap) = bootstrap {
-      self.ping(bootstrap).await?;
+      if let Err(err) = self.ping(bootstrap).await {
+        err.report();
+      }
     }
 
     while let Some(incoming) = self.endpoint.accept().await {
       let clone = self.clone();
       tokio::spawn(async move {
         if let Err(err) = clone.accept(incoming).await {
-          eprintln!("error: {err}");
+          err.report();
         }
       });
     }
@@ -141,11 +143,22 @@ impl Node {
   async fn send(&self, mut stream: SendStream, payload: Payload) -> Result {
     let message = Message {
       payload,
-      from: self.id,
+      from: self.id(),
     }
     .to_cbor();
 
+    assert!(message.len() < u16::MAX as usize);
+
+    let len = message.len() as u16;
+
+    stream
+      .write_all(&len.to_le_bytes())
+      .await
+      .context(WriteError)?;
+
     stream.write_all(&message).await.context(WriteError)?;
+
+    stream.stopped().await.unwrap();
 
     self.sent.fetch_add(1, atomic::Ordering::Relaxed);
 
@@ -192,17 +205,8 @@ impl Node {
     Ok(())
   }
 
-  #[cfg(test)]
-  fn contact(&self) -> Contact {
-    Contact {
-      address: self.address,
-      port: self.port,
-      id: self.id,
-    }
-  }
-
   async fn routes(&self, id: Hash) -> Vec<Contact> {
-    let i = Distance::new(self.id, id).bucket();
+    let i = Distance::new(self.id(), id).bucket();
 
     let routing_table = self.routing_table.read().await;
 
@@ -219,8 +223,12 @@ impl Node {
     contacts
   }
 
+  fn id(&self) -> Hash {
+    self.contact.id
+  }
+
   async fn update(&self, contact: Contact) {
-    let i = Distance::new(self.id, contact.id).bucket();
+    let i = Distance::new(self.id(), contact.id).bucket();
 
     let bucket = &mut self.routing_table.write().await[i];
 
