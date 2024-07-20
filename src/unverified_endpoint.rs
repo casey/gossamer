@@ -1,7 +1,11 @@
 use {
   super::*,
+  bytes::BytesMut,
   quinn::{
-    crypto::rustls::QuicClientConfig,
+    crypto::{
+      self, rustls::QuicClientConfig, CryptoError, ExportKeyingMaterialError, HeaderKey, KeyPair,
+      Keys, PacketKey, Session, UnsupportedVersion,
+    },
     rustls::{
       self,
       client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
@@ -11,10 +15,150 @@ use {
     },
     ClientConfig, Endpoint, ServerConfig,
   },
+  quinn_proto::{transport_parameters::TransportParameters, ConnectionId, Side, TransportError},
 };
 
 #[derive(Debug)]
 pub(crate) struct UnverifiedEndpoint(Arc<CryptoProvider>);
+
+struct PassthroughKey;
+
+impl HeaderKey for PassthroughKey {
+  fn decrypt(&self, _pn_offset: usize, _packet: &mut [u8]) {}
+  fn encrypt(&self, _pn_offset: usize, _packet: &mut [u8]) {}
+  fn sample_size(&self) -> usize {
+    0
+  }
+}
+
+impl PacketKey for PassthroughKey {
+  // Required methods
+  fn encrypt(&self, _packet: u64, _buf: &mut [u8], _header_len: usize) {}
+
+  fn decrypt(
+    &self,
+    _packet: u64,
+    _header: &[u8],
+    _payload: &mut BytesMut,
+  ) -> Result<(), CryptoError> {
+    Ok(())
+  }
+
+  fn tag_len(&self) -> usize {
+    0
+  }
+
+  fn confidentiality_limit(&self) -> u64 {
+    u64::MAX
+  }
+
+  fn integrity_limit(&self) -> u64 {
+    u64::MAX
+  }
+}
+
+struct PassthroughServerConfig;
+
+impl crypto::ServerConfig for PassthroughServerConfig {
+  fn initial_keys(
+    &self,
+    _version: u32,
+    _dst_cid: &ConnectionId,
+  ) -> Result<Keys, UnsupportedVersion> {
+    todo!()
+    // Ok(Keys {
+    //   header: KeyPair {
+    //     local: Box::new(PassthroughKey),
+    //     remote: Box::new(PassthroughKey),
+    //   },
+    //   packet: KeyPair {
+    //     local: Box::new(PassthroughKey),
+    //     remote: Box::new(PassthroughKey),
+    //   },
+    // })
+  }
+
+  fn retry_tag(&self, _version: u32, _orig_dst_cid: &ConnectionId, _packet: &[u8]) -> [u8; 16] {
+    todo!()
+    // Default::default()
+  }
+
+  fn start_session(
+    self: Arc<Self>,
+    _version: u32,
+    _params: &TransportParameters,
+  ) -> Box<dyn Session> {
+    todo!()
+    // Box::new(PassthroughSession)
+  }
+}
+
+struct PassthroughSession;
+
+impl Session for PassthroughSession {
+  fn initial_keys(&self, _dst_cid: &ConnectionId, _side: Side) -> Keys {
+    todo!()
+    // Keys {
+    //   header: KeyPair {
+    //     local: Box::new(PassthroughKey),
+    //     remote: Box::new(PassthroughKey),
+    //   },
+    //   packet: KeyPair {
+    //     local: Box::new(PassthroughKey),
+    //     remote: Box::new(PassthroughKey),
+    //   },
+    // }
+  }
+
+  fn handshake_data(&self) -> Option<Box<dyn Any>> {
+    todo!()
+  }
+
+  fn peer_identity(&self) -> Option<Box<dyn Any>> {
+    todo!()
+  }
+
+  fn early_crypto(&self) -> Option<(Box<dyn HeaderKey>, Box<dyn PacketKey>)> {
+    todo!()
+  }
+
+  fn early_data_accepted(&self) -> Option<bool> {
+    todo!()
+  }
+
+  fn is_handshaking(&self) -> bool {
+    todo!()
+  }
+
+  fn read_handshake(&mut self, _buf: &[u8]) -> Result<bool, TransportError> {
+    todo!()
+  }
+
+  fn transport_parameters(&self) -> Result<Option<TransportParameters>, TransportError> {
+    todo!()
+  }
+
+  fn write_handshake(&mut self, _buf: &mut Vec<u8>) -> Option<Keys> {
+    todo!()
+  }
+
+  fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
+    todo!()
+  }
+
+  fn is_valid_retry(&self, _orig_dst_cid: &ConnectionId, _header: &[u8], _payload: &[u8]) -> bool {
+    todo!()
+  }
+
+  fn export_keying_material(
+    &self,
+    _output: &mut [u8],
+    _label: &[u8],
+    _context: &[u8],
+  ) -> Result<(), ExportKeyingMaterialError> {
+    todo!()
+  }
+}
 
 impl UnverifiedEndpoint {
   pub(crate) const SERVER_NAME: &'static str = "localhost";

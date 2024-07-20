@@ -103,6 +103,10 @@ impl Node {
 
     let from = connection.remote_address();
 
+    // let identity = connection.peer_identity();
+
+    // Vec<[rustls::pki_types::CertificateDer]
+
     let (mut tx, rx) = connection.accept_bi().await.context(AcceptError)?;
 
     let message = self.receive(rx).await?;

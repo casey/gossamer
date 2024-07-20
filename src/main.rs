@@ -27,6 +27,7 @@ use {
   serde::{Deserialize, Deserializer, Serialize},
   snafu::{ensure, ErrorCompat, OptionExt, ResultExt, Snafu},
   std::{
+    any::Any,
     backtrace::{Backtrace, BacktraceStatus},
     cmp::Ordering,
     collections::{BTreeMap, HashMap, HashSet},
