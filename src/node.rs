@@ -1,4 +1,7 @@
-use super::*;
+use {
+  super::*,
+  quinn::{Connection, VarInt},
+};
 
 // Number of buckets in a node's routing table. For each bucket with position
 // `i` in the routing table, we store nodes at distance `i` from ourselves.
@@ -100,7 +103,7 @@ impl Node {
 
     let from = connection.remote_address();
 
-    let (tx, rx) = connection.accept_bi().await.context(AcceptError)?;
+    let (mut tx, rx) = connection.accept_bi().await.context(AcceptError)?;
 
     let message = self.receive(rx).await?;
 
@@ -117,14 +120,14 @@ impl Node {
     match message.payload {
       Payload::FindNode(hash) => {
         self
-          .send(tx, Payload::Nodes(self.routes(hash).await))
+          .send(&mut tx, Payload::Nodes(self.routes(hash).await))
           .await?
       }
 
-      Payload::Nodes(nodes) => {
+      Payload::Nodes(_) => {
         todo!()
       }
-      Payload::Ping => self.send(tx, Payload::Pong).await?,
+      Payload::Ping => self.send(&mut tx, Payload::Pong).await?,
       Payload::Pong => {}
       Payload::Store(hash) => {
         self
@@ -137,10 +140,12 @@ impl Node {
       }
     }
 
+    Self::finish(connection, tx).await;
+
     Ok(())
   }
 
-  async fn send(&self, mut stream: SendStream, payload: Payload) -> Result {
+  async fn send(&self, stream: &mut SendStream, payload: Payload) -> Result {
     let message = Message {
       payload,
       from: self.id(),
@@ -187,7 +192,7 @@ impl Node {
   // }
 
   async fn ping(&self, contact: Contact) -> Result {
-    let (tx, _rx) = self
+    let connection = self
       .endpoint
       .connect(
         (contact.address, contact.port).into(),
@@ -195,14 +200,21 @@ impl Node {
       )
       .context(ConnectError)?
       .await
-      .context(ConnectionError)?
-      .open_bi()
-      .await
       .context(ConnectionError)?;
 
-    self.send(tx, Payload::Ping).await?;
+    let (mut tx, _rx) = connection.open_bi().await.context(ConnectionError)?;
+
+    self.send(&mut tx, Payload::Ping).await?;
+
+    Self::finish(connection, tx).await;
 
     Ok(())
+  }
+
+  async fn finish(connection: Connection, mut tx: SendStream) {
+    tx.stopped().await.unwrap();
+
+    connection.close(VarInt::from_u32(0), b"done");
   }
 
   async fn routes(&self, id: Hash) -> Vec<Contact> {
