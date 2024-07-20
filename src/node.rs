@@ -153,15 +153,17 @@ impl Node {
   }
 
   async fn receive(&self, mut rx: RecvStream) -> Result<Message> {
-    let mut buffer = [0; u16::MAX as usize];
+    let mut len = [0; 2];
 
-    rx.read_exact(&mut buffer[..2]).await.context(ReadError)?;
+    rx.read_exact(&mut len).await.context(ReadError)?;
 
-    let len = u16::from_le_bytes([buffer[0], buffer[1]]) as usize;
+    let len = u16::from_le_bytes(len) as usize;
 
-    rx.read_exact(&mut buffer[..len]).await.context(ReadError)?;
+    let mut buffer = vec![0; len];
 
-    Message::from_cbor(&buffer[0..len]).context(DeserializeError)
+    rx.read_exact(&mut buffer).await.context(ReadError)?;
+
+    Message::from_cbor(&buffer).context(DeserializeError)
   }
 
   // pub(crate) async fn store(&self, hash: Hash) -> io::Result<()> {
