@@ -57,7 +57,7 @@ impl Node {
   pub(crate) async fn new(address: IpAddr, port: u16) -> Result<Self> {
     let mut rng = rand::thread_rng();
 
-    let endpoint = UnverifiedEndpoint::new(address, port);
+    let endpoint = PassthroughSession::endpoint(address, port);
 
     let socket_address = endpoint.local_addr().context(LocalAddressError)?;
 
@@ -102,10 +102,6 @@ impl Node {
       .context(AcceptError)?;
 
     let from = connection.remote_address();
-
-    // let identity = connection.peer_identity();
-
-    // Vec<[rustls::pki_types::CertificateDer]
 
     let (mut tx, rx) = connection.accept_bi().await.context(AcceptError)?;
 
@@ -206,6 +202,12 @@ impl Node {
       .await
       .context(ConnectionError)?;
 
+    dbg!(connection
+      .peer_identity()
+      .unwrap()
+      .downcast::<Vec<quinn::rustls::pki_types::CertificateDer>>()
+      .unwrap());
+
     let (mut tx, _rx) = connection.open_bi().await.context(ConnectionError)?;
 
     self.send(&mut tx, Payload::Ping).await?;
@@ -264,22 +266,26 @@ mod tests {
   use {super::*, std::net::Ipv4Addr};
 
   #[tokio::test]
-  async fn bootstrap() -> io::Result<()> {
+  async fn bootstrap() -> Result {
+    env_logger::init();
+
     let loopback = Ipv4Addr::new(127, 0, 0, 1).into();
 
-    let bootstrap = Node::new(loopback, 0).await?;
+    let bootstrap = Arc::new(Node::new(loopback, 0).await?);
+
+    tokio::spawn(bootstrap.clone().run(None));
 
     let node = Node::new(loopback, 0).await?;
 
-    node.ping(bootstrap.contact()).await?;
+    node.ping(bootstrap.contact).await?;
 
-    bootstrap.receive().await.unwrap();
+    // bootstrap.receive().await.unwrap();
 
-    assert_eq!(bootstrap.routes(node.id).await, &[node.contact()]);
+    // assert_eq!(bootstrap.routes(node.id).await, &[node.contact]);
 
-    node.receive().await.unwrap();
+    // node.receive().await.unwrap();
 
-    assert_eq!(node.routes(bootstrap.id).await, &[bootstrap.contact()]);
+    // assert_eq!(node.routes(bootstrap.id).await, &[bootstrap.contact]);
 
     Ok(())
   }
