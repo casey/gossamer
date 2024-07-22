@@ -4,8 +4,8 @@ use {
   self::{
     deserialize_from_str::DeserializeFromStr, distance::Distance, error::Error, into_u64::IntoU64,
     library::Library, message::Message, metadata::Metadata, node::Node, package::Package,
-    path_ext::PathExt, read_ext::ReadExt, report::Report, subcommand::Subcommand,
-    template::Template, unverified_endpoint::PassthroughSession, write_ext::WriteExt,
+    passthrough::PassthroughSession, path_ext::PathExt, read_ext::ReadExt, report::Report,
+    subcommand::Subcommand, template::Template, write_ext::WriteExt,
   },
   axum::{
     body::Body,
@@ -69,12 +69,12 @@ mod message;
 mod metadata;
 mod node;
 mod package;
+mod passthrough;
 mod path_ext;
 mod read_ext;
 mod report;
 mod subcommand;
 mod template;
-mod unverified_endpoint;
 mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;

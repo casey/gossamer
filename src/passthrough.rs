@@ -28,22 +28,22 @@ impl PassthroughKey {
   }
 }
 
-impl HandshakeTokenKey for PassthroughKey {
-  fn aead_from_hkdf(&self, _random_bytes: &[u8]) -> Box<dyn AeadKey> {
-    todo!()
-  }
-}
-
 impl AeadKey for PassthroughKey {
-  fn seal(&self, _data: &mut Vec<u8>, _additional_data: &[u8]) -> Result<(), CryptoError> {
-    todo!()
-  }
-
   fn open<'a>(
     &self,
     _data: &'a mut [u8],
     _additional_data: &[u8],
   ) -> Result<&'a mut [u8], CryptoError> {
+    todo!()
+  }
+
+  fn seal(&self, _data: &mut Vec<u8>, _additional_data: &[u8]) -> Result<(), CryptoError> {
+    todo!()
+  }
+}
+
+impl HandshakeTokenKey for PassthroughKey {
+  fn aead_from_hkdf(&self, _random_bytes: &[u8]) -> Box<dyn AeadKey> {
     todo!()
   }
 }
@@ -59,7 +59,9 @@ impl HeaderKey for PassthroughKey {
 }
 
 impl PacketKey for PassthroughKey {
-  fn encrypt(&self, _packet: u64, _buf: &mut [u8], _header_len: usize) {}
+  fn confidentiality_limit(&self) -> u64 {
+    u64::MAX
+  }
 
   fn decrypt(
     &self,
@@ -70,16 +72,34 @@ impl PacketKey for PassthroughKey {
     Ok(())
   }
 
-  fn tag_len(&self) -> usize {
-    0
-  }
-
-  fn confidentiality_limit(&self) -> u64 {
-    u64::MAX
-  }
+  fn encrypt(&self, _packet: u64, _buf: &mut [u8], _header_len: usize) {}
 
   fn integrity_limit(&self) -> u64 {
     todo!();
+  }
+
+  fn tag_len(&self) -> usize {
+    0
+  }
+}
+
+struct PassthroughClientConfig {
+  id: Hash,
+}
+
+impl crypto::ClientConfig for PassthroughClientConfig {
+  fn start_session(
+    self: Arc<Self>,
+    _version: u32,
+    server_name: &str,
+    params: &TransportParameters,
+  ) -> Result<Box<dyn Session>, ConnectError> {
+    Ok(Box::new(PassthroughSession::new(
+      self.id,
+      Some(server_name.parse::<Hash>().unwrap()),
+      Side::Client,
+      params,
+    )))
   }
 }
 
@@ -107,7 +127,6 @@ impl crypto::ServerConfig for PassthroughServerConfig {
 
   fn retry_tag(&self, _version: u32, _orig_dst_cid: &ConnectionId, _packet: &[u8]) -> [u8; 16] {
     todo!()
-    // Default::default()
   }
 
   fn start_session(
@@ -119,19 +138,6 @@ impl crypto::ServerConfig for PassthroughServerConfig {
   }
 }
 
-pub(crate) struct PassthroughSession {
-  id: Hash,
-  params: TransportParameters,
-  remote_id: Option<Hash>,
-  remote_params: Option<TransportParameters>,
-  side: Side,
-  state: State,
-}
-
-struct PassthroughClientConfig {
-  id: Hash,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum State {
   Initial,
@@ -141,30 +147,23 @@ enum State {
   Data,
 }
 
-impl crypto::ClientConfig for PassthroughClientConfig {
-  fn start_session(
-    self: Arc<Self>,
-    _version: u32,
-    server_name: &str,
-    params: &TransportParameters,
-  ) -> Result<Box<dyn Session>, ConnectError> {
-    Ok(Box::new(PassthroughSession::new(
-      self.id,
-      Some(server_name.parse::<Hash>().unwrap()),
-      Side::Client,
-      params,
-    )))
-  }
+pub(crate) struct PassthroughSession {
+  id: Hash,
+  params: TransportParameters,
+  remote_id: Option<Hash>,
+  remote_params: Option<TransportParameters>,
+  side: Side,
+  state: State,
 }
 
 impl PassthroughSession {
   fn new(id: Hash, remote_id: Option<Hash>, side: Side, params: &TransportParameters) -> Self {
     Self {
-      side,
       id,
-      remote_id,
       params: *params,
+      remote_id,
       remote_params: None,
+      side,
       state: State::Initial,
     }
   }
@@ -199,23 +198,6 @@ impl PassthroughSession {
 }
 
 impl Session for PassthroughSession {
-  fn initial_keys(&self, _dst_cid: &ConnectionId, _side: Side) -> Keys {
-    self.log("initial_keys");
-    PassthroughKey::keys()
-  }
-
-  fn handshake_data(&self) -> Option<Box<dyn Any>> {
-    todo!()
-  }
-
-  fn peer_identity(&self) -> Option<Box<dyn Any>> {
-    if let Some(remote_id) = self.remote_id {
-      Some(Box::new(remote_id))
-    } else {
-      None
-    }
-  }
-
   fn early_crypto(&self) -> Option<(Box<dyn HeaderKey>, Box<dyn PacketKey>)> {
     self.log("early crypto");
     Some((Box::new(PassthroughKey), Box::new(PassthroughKey)))
@@ -225,9 +207,47 @@ impl Session for PassthroughSession {
     Some(true)
   }
 
+  fn export_keying_material(
+    &self,
+    _output: &mut [u8],
+    _label: &[u8],
+    _context: &[u8],
+  ) -> Result<(), ExportKeyingMaterialError> {
+    todo!()
+  }
+
+  fn handshake_data(&self) -> Option<Box<dyn Any>> {
+    todo!()
+  }
+
+  fn initial_keys(&self, _dst_cid: &ConnectionId, _side: Side) -> Keys {
+    self.log("initial_keys");
+    PassthroughKey::keys()
+  }
+
   fn is_handshaking(&self) -> bool {
     self.log(&format!("is_handshaking"));
     self.state != State::Data
+  }
+
+  fn is_valid_retry(&self, _orig_dst_cid: &ConnectionId, _header: &[u8], _payload: &[u8]) -> bool {
+    todo!()
+  }
+
+  fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
+    self.log("next_1rtt_keys");
+    Some(KeyPair {
+      local: Box::new(PassthroughKey),
+      remote: Box::new(PassthroughKey),
+    })
+  }
+
+  fn peer_identity(&self) -> Option<Box<dyn Any>> {
+    if let Some(remote_id) = self.remote_id {
+      Some(Box::new(remote_id))
+    } else {
+      None
+    }
   }
 
   fn read_handshake(&mut self, buf: &[u8]) -> Result<bool, TransportError> {
@@ -288,26 +308,5 @@ impl Session for PassthroughSession {
       }
       _ => None,
     }
-  }
-
-  fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
-    self.log("next_1rtt_keys");
-    Some(KeyPair {
-      local: Box::new(PassthroughKey),
-      remote: Box::new(PassthroughKey),
-    })
-  }
-
-  fn is_valid_retry(&self, _orig_dst_cid: &ConnectionId, _header: &[u8], _payload: &[u8]) -> bool {
-    todo!()
-  }
-
-  fn export_keying_material(
-    &self,
-    _output: &mut [u8],
-    _label: &[u8],
-    _context: &[u8],
-  ) -> Result<(), ExportKeyingMaterialError> {
-    todo!()
   }
 }
