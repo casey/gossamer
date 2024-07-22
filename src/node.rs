@@ -107,31 +107,31 @@ impl Node {
 
     let (mut tx, rx) = connection.accept_bi().await.context(AcceptError)?;
 
-    let message = self.receive(rx).await?;
-
     let from = Contact {
       address: from.ip(),
-      id: message.from,
+      id: *connection.peer_identity().unwrap().downcast().unwrap(),
       port: from.port(),
     };
 
     self.update(from).await;
 
+    let message = self.receive(rx).await?;
+
     self.received.fetch_add(1, atomic::Ordering::Relaxed);
 
-    match message.payload {
-      Payload::FindNode(hash) => {
+    match message {
+      Message::FindNode(hash) => {
         self
-          .send(&mut tx, Payload::Nodes(self.routes(hash).await))
+          .send(&mut tx, Message::Nodes(self.routes(hash).await))
           .await?
       }
 
-      Payload::Nodes(_) => {
+      Message::Nodes(_) => {
         todo!()
       }
-      Payload::Ping => self.send(&mut tx, Payload::Pong).await?,
-      Payload::Pong => {}
-      Payload::Store(hash) => {
+      Message::Ping => self.send(&mut tx, Message::Pong).await?,
+      Message::Pong => {}
+      Message::Store(hash) => {
         self
           .directory
           .write()
@@ -147,12 +147,8 @@ impl Node {
     Ok(())
   }
 
-  async fn send(&self, stream: &mut SendStream, payload: Payload) -> Result {
-    let message = Message {
-      payload,
-      from: self.id(),
-    }
-    .to_cbor();
+  async fn send(&self, stream: &mut SendStream, message: Message) -> Result {
+    let message = message.to_cbor();
 
     assert!(message.len() < u16::MAX as usize);
 
@@ -212,7 +208,7 @@ impl Node {
 
     let (mut tx, _rx) = connection.open_bi().await.context(ConnectionError)?;
 
-    self.send(&mut tx, Payload::Ping).await?;
+    self.send(&mut tx, Message::Ping).await?;
 
     Self::finish(connection, tx).await;
 
