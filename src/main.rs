@@ -2,23 +2,10 @@
 
 use {
   self::{
-    deserialize_from_str::DeserializeFromStr,
-    distance::Distance,
-    error::Error,
-    into_u64::IntoU64,
-    library::Library,
-    message::Message,
-    metadata::Metadata,
-    node::Node,
-    package::Package,
-    path_ext::PathExt,
-    payload::Payload,
-    read_ext::ReadExt,
-    report::Report,
-    subcommand::Subcommand,
-    template::Template,
-    unverified_endpoint::{PassthroughSession, UnverifiedEndpoint},
-    write_ext::WriteExt,
+    deserialize_from_str::DeserializeFromStr, distance::Distance, error::Error, into_u64::IntoU64,
+    library::Library, message::Message, metadata::Metadata, node::Node, package::Package,
+    path_ext::PathExt, payload::Payload, read_ext::ReadExt, report::Report, subcommand::Subcommand,
+    template::Template, unverified_endpoint::PassthroughSession, write_ext::WriteExt,
   },
   axum::{
     body::Body,

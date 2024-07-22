@@ -57,7 +57,9 @@ impl Node {
   pub(crate) async fn new(address: IpAddr, port: u16) -> Result<Self> {
     let mut rng = rand::thread_rng();
 
-    let endpoint = PassthroughSession::endpoint(address, port);
+    let id = Hash::from(std::array::from_fn(|_| rng.gen()));
+
+    let endpoint = PassthroughSession::endpoint(id, address, port);
 
     let socket_address = endpoint.local_addr().context(LocalAddressError)?;
 
@@ -65,7 +67,7 @@ impl Node {
       contact: Contact {
         address: socket_address.ip(),
         port: socket_address.port(),
-        id: Hash::from(std::array::from_fn(|_| rng.gen())),
+        id,
       },
       directory: RwLock::default(),
       endpoint,
@@ -196,7 +198,7 @@ impl Node {
       .endpoint
       .connect(
         (contact.address, contact.port).into(),
-        UnverifiedEndpoint::SERVER_NAME,
+        &contact.id.to_string(),
       )
       .context(ConnectError)?
       .await
@@ -205,7 +207,7 @@ impl Node {
     dbg!(connection
       .peer_identity()
       .unwrap()
-      .downcast::<Vec<quinn::rustls::pki_types::CertificateDer>>()
+      .downcast::<Hash>()
       .unwrap());
 
     let (mut tx, _rx) = connection.open_bi().await.context(ConnectionError)?;

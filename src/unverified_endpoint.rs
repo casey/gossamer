@@ -3,23 +3,13 @@ use {
   bytes::BytesMut,
   quinn::{
     crypto::{
-      self, rustls::QuicClientConfig, AeadKey, CryptoError, ExportKeyingMaterialError,
-      HandshakeTokenKey, HeaderKey, KeyPair, Keys, PacketKey, Session, UnsupportedVersion,
-    },
-    rustls::{
-      self,
-      client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier},
-      crypto::{ring, verify_tls12_signature, verify_tls13_signature, CryptoProvider},
-      pki_types::{CertificateDer, PrivatePkcs8KeyDer, ServerName, UnixTime},
-      DigitallySignedStruct, SignatureScheme,
+      self, AeadKey, CryptoError, ExportKeyingMaterialError, HandshakeTokenKey, HeaderKey, KeyPair,
+      Keys, PacketKey, Session, UnsupportedVersion,
     },
     ClientConfig, ConnectError, Endpoint, ServerConfig,
   },
   quinn_proto::{transport_parameters::TransportParameters, ConnectionId, Side, TransportError},
 };
-
-#[derive(Debug)]
-pub(crate) struct UnverifiedEndpoint(Arc<CryptoProvider>);
 
 struct PassthroughKey;
 
@@ -51,7 +41,7 @@ impl AeadKey for PassthroughKey {
 
   fn open<'a>(
     &self,
-    data: &'a mut [u8],
+    _data: &'a mut [u8],
     _additional_data: &[u8],
   ) -> Result<&'a mut [u8], CryptoError> {
     todo!()
@@ -93,7 +83,9 @@ impl PacketKey for PassthroughKey {
   }
 }
 
-struct PassthroughServerConfig;
+struct PassthroughServerConfig {
+  id: Hash,
+}
 
 impl crypto::ServerConfig for PassthroughServerConfig {
   fn initial_keys(
@@ -123,68 +115,85 @@ impl crypto::ServerConfig for PassthroughServerConfig {
     _version: u32,
     params: &TransportParameters,
   ) -> Box<dyn Session> {
-    Box::new(PassthroughSession {
-      side: Side::Server,
-      n: 0,
-      k: false,
-      w: false,
-      params: params.clone(),
-      p: None,
-    })
+    Box::new(PassthroughSession::new(self.id, None, Side::Server, params))
   }
 }
 
 pub(crate) struct PassthroughSession {
-  side: Side,
-  n: u32,
+  id: Hash,
   params: TransportParameters,
-  p: Option<TransportParameters>,
-  k: bool,
-  w: bool,
+  remote_id: Option<Hash>,
+  remote_params: Option<TransportParameters>,
+  side: Side,
+  state: State,
 }
 
-struct PassthroughClientConfig;
+struct PassthroughClientConfig {
+  id: Hash,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+enum State {
+  Initial,
+  ZeroRtt,
+  Handshake,
+  OneRtt,
+  Data,
+}
 
 impl crypto::ClientConfig for PassthroughClientConfig {
   fn start_session(
     self: Arc<Self>,
-    version: u32,
+    _version: u32,
     server_name: &str,
     params: &TransportParameters,
   ) -> Result<Box<dyn Session>, ConnectError> {
-    Ok(Box::new(PassthroughSession {
-      n: 0,
-      side: Side::Client,
-      params: params.clone(),
-      p: None,
-      k: false,
-      w: false,
-    }))
+    Ok(Box::new(PassthroughSession::new(
+      self.id,
+      Some(server_name.parse::<Hash>().unwrap()),
+      Side::Client,
+      params,
+    )))
   }
 }
 
 impl PassthroughSession {
-  pub(crate) fn endpoint(address: IpAddr, port: u16) -> Endpoint {
+  fn new(id: Hash, remote_id: Option<Hash>, side: Side, params: &TransportParameters) -> Self {
+    Self {
+      side,
+      id,
+      remote_id,
+      params: *params,
+      remote_params: None,
+      state: State::Initial,
+    }
+  }
+
+  pub(crate) fn endpoint(id: Hash, address: IpAddr, port: u16) -> Endpoint {
     log::trace!("getting endpoint for passthrough session");
 
     let mut endpoint = Endpoint::server(
-      ServerConfig::new(Arc::new(PassthroughServerConfig), Arc::new(PassthroughKey)),
+      ServerConfig::new(
+        Arc::new(PassthroughServerConfig { id }),
+        Arc::new(PassthroughKey),
+      ),
       (address, port).into(),
     )
     .unwrap();
 
-    endpoint.set_default_client_config(ClientConfig::new(Arc::new(PassthroughClientConfig)));
+    endpoint.set_default_client_config(ClientConfig::new(Arc::new(PassthroughClientConfig { id })));
 
     endpoint
   }
 
   fn log(&self, message: &str) {
     log::debug!(
-      "{}: {message}",
+      "{}: {:?}: {message}",
       match self.side {
         Side::Server => "server",
         Side::Client => "client",
       },
+      self.state,
     );
   }
 }
@@ -200,49 +209,85 @@ impl Session for PassthroughSession {
   }
 
   fn peer_identity(&self) -> Option<Box<dyn Any>> {
-    todo!()
+    if let Some(remote_id) = self.remote_id {
+      Some(Box::new(remote_id))
+    } else {
+      None
+    }
   }
 
   fn early_crypto(&self) -> Option<(Box<dyn HeaderKey>, Box<dyn PacketKey>)> {
     self.log("early crypto");
-    None
+    Some((Box::new(PassthroughKey), Box::new(PassthroughKey)))
   }
 
   fn early_data_accepted(&self) -> Option<bool> {
-    todo!()
+    Some(true)
   }
 
   fn is_handshaking(&self) -> bool {
-    self.log("is_handshaking");
-    !self.k || !self.w || self.p.is_none()
+    self.log(&format!("is_handshaking"));
+    self.state != State::Data
   }
 
   fn read_handshake(&mut self, buf: &[u8]) -> Result<bool, TransportError> {
-    self.log("read handshake");
-    let result = self.p.is_none();
-    self.p = Some(TransportParameters::read(self.side, &mut Cursor::new(buf)).unwrap());
-    Ok(result)
+    self.log(&format!("read handshake: {buf:x?}"));
+    let array: [u8; Hash::LEN] = buf[..Hash::LEN].try_into().unwrap();
+    let remote_id = Hash::from(array);
+    if let Some(expected_id) = self.remote_id {
+      assert_eq!(remote_id, expected_id);
+    } else {
+      self.remote_id = Some(remote_id);
+    }
+    self.remote_params =
+      Some(TransportParameters::read(self.side, &mut Cursor::new(&buf[Hash::LEN..])).unwrap());
+    match (self.state, self.side) {
+      (State::Initial, Side::Server) => {
+        self.state = State::ZeroRtt;
+      }
+      (State::Handshake, Side::Client) => {
+        self.state = State::OneRtt;
+      }
+      _ => panic!(),
+    }
+
+    Ok(true)
   }
 
   fn transport_parameters(&self) -> Result<Option<TransportParameters>, TransportError> {
     self.log("transport_parameters");
-    Ok(self.p.clone())
+    if self.state == State::Handshake && self.side == Side::Client {
+      Ok(Some(self.params))
+    } else {
+      Ok(self.remote_params)
+    }
   }
 
   fn write_handshake(&mut self, buf: &mut Vec<u8>) -> Option<Keys> {
     self.log("write_handshake");
-
-    if !self.w {
-      self.w = true;
-      self.params.write(buf);
+    match (self.state, self.side) {
+      (State::Initial, Side::Client) => {
+        buf.extend_from_slice(self.id.as_bytes());
+        self.params.write(buf);
+        self.state = State::ZeroRtt;
+        None
+      }
+      (State::ZeroRtt, _) => {
+        self.state = State::Handshake;
+        Some(PassthroughKey::keys())
+      }
+      (State::Handshake, Side::Server) => {
+        buf.extend_from_slice(self.id.as_bytes());
+        self.params.write(buf);
+        self.state = State::Data;
+        Some(PassthroughKey::keys())
+      }
+      (State::OneRtt, _) => {
+        self.state = State::Data;
+        Some(PassthroughKey::keys())
+      }
+      _ => None,
     }
-
-    if self.p.is_some() && !self.k {
-      self.k = true;
-      return Some(PassthroughKey::keys());
-    }
-
-    None
   }
 
   fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
@@ -264,79 +309,5 @@ impl Session for PassthroughSession {
     _context: &[u8],
   ) -> Result<(), ExportKeyingMaterialError> {
     todo!()
-  }
-}
-
-impl UnverifiedEndpoint {
-  pub(crate) const SERVER_NAME: &'static str = "localhost";
-
-  pub(crate) fn new(address: IpAddr, port: u16) -> Endpoint {
-    let cert = rcgen::generate_simple_self_signed(vec![Self::SERVER_NAME.into()]).unwrap();
-    let cert_der = CertificateDer::from(cert.cert);
-    let priv_key = PrivatePkcs8KeyDer::from(cert.key_pair.serialize_der());
-
-    let mut server_config =
-      ServerConfig::with_single_cert(vec![cert_der.clone()], priv_key.into()).unwrap();
-    let transport_config = Arc::get_mut(&mut server_config.transport).unwrap();
-    transport_config.max_concurrent_uni_streams(0_u8.into());
-
-    let mut endpoint = Endpoint::server(server_config, (address, port).into()).unwrap();
-
-    endpoint.set_default_client_config(ClientConfig::new(Arc::new(
-      QuicClientConfig::try_from(
-        rustls::ClientConfig::builder()
-          .dangerous()
-          .with_custom_certificate_verifier(Arc::new(Self(Arc::new(ring::default_provider()))))
-          .with_no_client_auth(),
-      )
-      .unwrap(),
-    )));
-
-    endpoint
-  }
-}
-
-impl ServerCertVerifier for UnverifiedEndpoint {
-  fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-    self.0.signature_verification_algorithms.supported_schemes()
-  }
-
-  fn verify_server_cert(
-    &self,
-    _end_entity: &CertificateDer<'_>,
-    _intermediates: &[CertificateDer<'_>],
-    _server_name: &ServerName<'_>,
-    _ocsp: &[u8],
-    _now: UnixTime,
-  ) -> Result<ServerCertVerified, rustls::Error> {
-    Ok(ServerCertVerified::assertion())
-  }
-
-  fn verify_tls12_signature(
-    &self,
-    message: &[u8],
-    cert: &CertificateDer<'_>,
-    dss: &DigitallySignedStruct,
-  ) -> Result<HandshakeSignatureValid, rustls::Error> {
-    verify_tls12_signature(
-      message,
-      cert,
-      dss,
-      &self.0.signature_verification_algorithms,
-    )
-  }
-
-  fn verify_tls13_signature(
-    &self,
-    message: &[u8],
-    cert: &CertificateDer<'_>,
-    dss: &DigitallySignedStruct,
-  ) -> Result<HandshakeSignatureValid, rustls::Error> {
-    verify_tls13_signature(
-      message,
-      cert,
-      dss,
-      &self.0.signature_verification_algorithms,
-    )
   }
 }
