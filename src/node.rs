@@ -129,8 +129,7 @@ impl Node {
       Message::Nodes(_) => {
         todo!()
       }
-      Message::Ping => self.send(&mut tx, Message::Pong).await?,
-      Message::Pong => {}
+      Message::Ping => {}
       Message::Store(hash) => {
         self
           .directory
@@ -200,11 +199,16 @@ impl Node {
       .await
       .context(ConnectionError)?;
 
-    dbg!(connection
-      .peer_identity()
-      .unwrap()
-      .downcast::<Hash>()
-      .unwrap());
+    assert_eq!(
+      *connection
+        .peer_identity()
+        .unwrap()
+        .downcast::<Hash>()
+        .unwrap(),
+      contact.id,
+    );
+
+    self.update(contact).await;
 
     let (mut tx, _rx) = connection.open_bi().await.context(ConnectionError)?;
 
@@ -277,13 +281,9 @@ mod tests {
 
     node.ping(bootstrap.contact).await?;
 
-    // bootstrap.receive().await.unwrap();
+    assert_eq!(bootstrap.routes(node.id()).await, &[node.contact]);
 
-    // assert_eq!(bootstrap.routes(node.id).await, &[node.contact]);
-
-    // node.receive().await.unwrap();
-
-    // assert_eq!(node.routes(bootstrap.id).await, &[bootstrap.contact]);
+    assert_eq!(node.routes(bootstrap.id()).await, &[bootstrap.contact]);
 
     Ok(())
   }
