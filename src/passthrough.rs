@@ -169,8 +169,6 @@ impl PassthroughSession {
   }
 
   pub(crate) fn endpoint(id: Hash, address: IpAddr, port: u16) -> Endpoint {
-    log::trace!("getting endpoint for passthrough session");
-
     let mut endpoint = Endpoint::server(
       ServerConfig::new(
         Arc::new(PassthroughServerConfig { id }),
@@ -184,22 +182,10 @@ impl PassthroughSession {
 
     endpoint
   }
-
-  fn log(&self, message: &str) {
-    log::debug!(
-      "{}: {:?}: {message}",
-      match self.side {
-        Side::Server => "server",
-        Side::Client => "client",
-      },
-      self.state,
-    );
-  }
 }
 
 impl Session for PassthroughSession {
   fn early_crypto(&self) -> Option<(Box<dyn HeaderKey>, Box<dyn PacketKey>)> {
-    self.log("early crypto");
     Some((Box::new(PassthroughKey), Box::new(PassthroughKey)))
   }
 
@@ -221,12 +207,10 @@ impl Session for PassthroughSession {
   }
 
   fn initial_keys(&self, _dst_cid: &ConnectionId, _side: Side) -> Keys {
-    self.log("initial_keys");
     PassthroughKey::keys()
   }
 
   fn is_handshaking(&self) -> bool {
-    self.log(&format!("is_handshaking"));
     self.state != State::Data
   }
 
@@ -235,7 +219,6 @@ impl Session for PassthroughSession {
   }
 
   fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
-    self.log("next_1rtt_keys");
     Some(KeyPair {
       local: Box::new(PassthroughKey),
       remote: Box::new(PassthroughKey),
@@ -251,7 +234,6 @@ impl Session for PassthroughSession {
   }
 
   fn read_handshake(&mut self, buf: &[u8]) -> Result<bool, TransportError> {
-    self.log(&format!("read handshake: {buf:x?}"));
     let array: [u8; Hash::LEN] = buf[..Hash::LEN].try_into().unwrap();
     let remote_id = Hash::from(array);
     if let Some(expected_id) = self.remote_id {
@@ -275,7 +257,6 @@ impl Session for PassthroughSession {
   }
 
   fn transport_parameters(&self) -> Result<Option<TransportParameters>, TransportError> {
-    self.log("transport_parameters");
     if self.state == State::Handshake && self.side == Side::Client {
       Ok(Some(self.params))
     } else {
@@ -284,7 +265,6 @@ impl Session for PassthroughSession {
   }
 
   fn write_handshake(&mut self, buf: &mut Vec<u8>) -> Option<Keys> {
-    self.log("write_handshake");
     match (self.state, self.side) {
       (State::Initial, Side::Client) => {
         buf.extend_from_slice(self.id.as_bytes());
