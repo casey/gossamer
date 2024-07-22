@@ -4,7 +4,7 @@ use {
   self::{
     deserialize_from_str::DeserializeFromStr, distance::Distance, error::Error, into_u64::IntoU64,
     library::Library, message::Message, metadata::Metadata, node::Node, package::Package,
-    passthrough::PassthroughSession, path_ext::PathExt, read_ext::ReadExt, report::Report,
+    passthrough::Session, path_ext::PathExt, read_ext::ReadExt, report::Report,
     subcommand::Subcommand, template::Template, write_ext::WriteExt,
   },
   axum::{

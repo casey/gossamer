@@ -4,31 +4,31 @@ use {
   quinn::{
     crypto::{
       self, AeadKey, CryptoError, ExportKeyingMaterialError, HandshakeTokenKey, HeaderKey, KeyPair,
-      Keys, PacketKey, Session, UnsupportedVersion,
+      Keys, PacketKey, UnsupportedVersion,
     },
-    ClientConfig, ConnectError, Endpoint, ServerConfig,
+    ConnectError, Endpoint,
   },
   quinn_proto::{transport_parameters::TransportParameters, ConnectionId, Side, TransportError},
 };
 
-struct PassthroughKey;
+struct Key;
 
-impl PassthroughKey {
+impl Key {
   fn keys() -> Keys {
     Keys {
       header: KeyPair {
-        local: Box::new(PassthroughKey),
-        remote: Box::new(PassthroughKey),
+        local: Box::new(Key),
+        remote: Box::new(Key),
       },
       packet: KeyPair {
-        local: Box::new(PassthroughKey),
-        remote: Box::new(PassthroughKey),
+        local: Box::new(Key),
+        remote: Box::new(Key),
       },
     }
   }
 }
 
-impl AeadKey for PassthroughKey {
+impl AeadKey for Key {
   fn open<'a>(
     &self,
     _data: &'a mut [u8],
@@ -42,13 +42,13 @@ impl AeadKey for PassthroughKey {
   }
 }
 
-impl HandshakeTokenKey for PassthroughKey {
+impl HandshakeTokenKey for Key {
   fn aead_from_hkdf(&self, _random_bytes: &[u8]) -> Box<dyn AeadKey> {
     todo!()
   }
 }
 
-impl HeaderKey for PassthroughKey {
+impl HeaderKey for Key {
   fn decrypt(&self, _pn_offset: usize, _packet: &mut [u8]) {}
 
   fn encrypt(&self, _pn_offset: usize, _packet: &mut [u8]) {}
@@ -58,7 +58,7 @@ impl HeaderKey for PassthroughKey {
   }
 }
 
-impl PacketKey for PassthroughKey {
+impl PacketKey for Key {
   fn confidentiality_limit(&self) -> u64 {
     u64::MAX
   }
@@ -83,18 +83,18 @@ impl PacketKey for PassthroughKey {
   }
 }
 
-struct PassthroughClientConfig {
+struct ClientConfig {
   id: Hash,
 }
 
-impl crypto::ClientConfig for PassthroughClientConfig {
+impl crypto::ClientConfig for ClientConfig {
   fn start_session(
     self: Arc<Self>,
     _version: u32,
     server_name: &str,
     params: &TransportParameters,
-  ) -> Result<Box<dyn Session>, ConnectError> {
-    Ok(Box::new(PassthroughSession::new(
+  ) -> Result<Box<dyn crypto::Session>, ConnectError> {
+    Ok(Box::new(Session::new(
       self.id,
       Some(server_name.parse::<Hash>().unwrap()),
       Side::Client,
@@ -103,11 +103,11 @@ impl crypto::ClientConfig for PassthroughClientConfig {
   }
 }
 
-struct PassthroughServerConfig {
+struct ServerConfig {
   id: Hash,
 }
 
-impl crypto::ServerConfig for PassthroughServerConfig {
+impl crypto::ServerConfig for ServerConfig {
   fn initial_keys(
     &self,
     _version: u32,
@@ -115,12 +115,12 @@ impl crypto::ServerConfig for PassthroughServerConfig {
   ) -> Result<Keys, UnsupportedVersion> {
     Ok(Keys {
       header: KeyPair {
-        local: Box::new(PassthroughKey),
-        remote: Box::new(PassthroughKey),
+        local: Box::new(Key),
+        remote: Box::new(Key),
       },
       packet: KeyPair {
-        local: Box::new(PassthroughKey),
-        remote: Box::new(PassthroughKey),
+        local: Box::new(Key),
+        remote: Box::new(Key),
       },
     })
   }
@@ -133,8 +133,8 @@ impl crypto::ServerConfig for PassthroughServerConfig {
     self: Arc<Self>,
     _version: u32,
     params: &TransportParameters,
-  ) -> Box<dyn Session> {
-    Box::new(PassthroughSession::new(self.id, None, Side::Server, params))
+  ) -> Box<dyn crypto::Session> {
+    Box::new(Session::new(self.id, None, Side::Server, params))
   }
 }
 
@@ -147,7 +147,7 @@ enum State {
   Data,
 }
 
-pub(crate) struct PassthroughSession {
+pub(crate) struct Session {
   id: Hash,
   params: TransportParameters,
   remote_id: Option<Hash>,
@@ -156,7 +156,7 @@ pub(crate) struct PassthroughSession {
   state: State,
 }
 
-impl PassthroughSession {
+impl Session {
   fn new(id: Hash, remote_id: Option<Hash>, side: Side, params: &TransportParameters) -> Self {
     Self {
       id,
@@ -170,23 +170,20 @@ impl PassthroughSession {
 
   pub(crate) fn endpoint(id: Hash, address: IpAddr, port: u16) -> Endpoint {
     let mut endpoint = Endpoint::server(
-      ServerConfig::new(
-        Arc::new(PassthroughServerConfig { id }),
-        Arc::new(PassthroughKey),
-      ),
+      quinn::ServerConfig::new(Arc::new(ServerConfig { id }), Arc::new(Key)),
       (address, port).into(),
     )
     .unwrap();
 
-    endpoint.set_default_client_config(ClientConfig::new(Arc::new(PassthroughClientConfig { id })));
+    endpoint.set_default_client_config(quinn::ClientConfig::new(Arc::new(ClientConfig { id })));
 
     endpoint
   }
 }
 
-impl Session for PassthroughSession {
+impl crypto::Session for Session {
   fn early_crypto(&self) -> Option<(Box<dyn HeaderKey>, Box<dyn PacketKey>)> {
-    Some((Box::new(PassthroughKey), Box::new(PassthroughKey)))
+    Some((Box::new(Key), Box::new(Key)))
   }
 
   fn early_data_accepted(&self) -> Option<bool> {
@@ -207,7 +204,7 @@ impl Session for PassthroughSession {
   }
 
   fn initial_keys(&self, _dst_cid: &ConnectionId, _side: Side) -> Keys {
-    PassthroughKey::keys()
+    Key::keys()
   }
 
   fn is_handshaking(&self) -> bool {
@@ -220,8 +217,8 @@ impl Session for PassthroughSession {
 
   fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
     Some(KeyPair {
-      local: Box::new(PassthroughKey),
-      remote: Box::new(PassthroughKey),
+      local: Box::new(Key),
+      remote: Box::new(Key),
     })
   }
 
@@ -274,17 +271,17 @@ impl Session for PassthroughSession {
       }
       (State::ZeroRtt, _) => {
         self.state = State::Handshake;
-        Some(PassthroughKey::keys())
+        Some(Key::keys())
       }
       (State::Handshake, Side::Server) => {
         buf.extend_from_slice(self.id.as_bytes());
         self.params.write(buf);
         self.state = State::Data;
-        Some(PassthroughKey::keys())
+        Some(Key::keys())
       }
       (State::OneRtt, _) => {
         self.state = State::Data;
-        Some(PassthroughKey::keys())
+        Some(Key::keys())
       }
       _ => None,
     }

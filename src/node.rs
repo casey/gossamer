@@ -59,7 +59,7 @@ impl Node {
 
     let id = Hash::from(std::array::from_fn(|_| rng.gen()));
 
-    let endpoint = PassthroughSession::endpoint(id, address, port);
+    let endpoint = Session::endpoint(id, address, port);
 
     let socket_address = endpoint.local_addr().context(LocalAddressError)?;
 
