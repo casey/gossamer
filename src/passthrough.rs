@@ -250,7 +250,7 @@ impl Session for PassthroughSession {
       (State::Handshake, Side::Client) => {
         self.state = State::OneRtt;
       }
-      _ => panic!(),
+      _ => todo!(),
     }
 
     Ok(true)
