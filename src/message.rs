@@ -6,5 +6,6 @@ pub(crate) enum Message {
   FindNode(Hash),
   Nodes(Vec<Contact>),
   Ping,
+  Pong,
   Store(Hash),
 }

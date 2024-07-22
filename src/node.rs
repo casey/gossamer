@@ -107,6 +107,8 @@ impl Node {
 
     let (mut tx, rx) = connection.accept_bi().await.context(AcceptError)?;
 
+    let message = self.receive(rx).await?;
+
     let from = Contact {
       address: from.ip(),
       id: *connection.peer_identity().unwrap().downcast().unwrap(),
@@ -114,8 +116,6 @@ impl Node {
     };
 
     self.update(from).await;
-
-    let message = self.receive(rx).await?;
 
     self.received.fetch_add(1, atomic::Ordering::Relaxed);
 
@@ -129,7 +129,8 @@ impl Node {
       Message::Nodes(_) => {
         todo!()
       }
-      Message::Ping => {}
+      Message::Ping => self.send(&mut tx, Message::Pong).await?,
+      Message::Pong => todo!(),
       Message::Store(hash) => {
         self
           .directory
@@ -208,11 +209,13 @@ impl Node {
       contact.id,
     );
 
-    self.update(contact).await;
-
-    let (mut tx, _rx) = connection.open_bi().await.context(ConnectionError)?;
+    let (mut tx, rx) = connection.open_bi().await.context(ConnectionError)?;
 
     self.send(&mut tx, Message::Ping).await?;
+
+    assert!(matches!(self.receive(rx).await?, Message::Pong));
+
+    self.update(contact).await;
 
     Self::finish(connection, tx).await;
 
