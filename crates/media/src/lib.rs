@@ -13,7 +13,13 @@ use {
 };
 
 pub use {
-  cbor::Cbor, hash::Hash, manifest::Manifest, media::Media, peer::Peer, target::Target, ty::Type,
+  cbor::{FromCbor, ToCbor},
+  hash::Hash,
+  manifest::Manifest,
+  media::Media,
+  peer::Peer,
+  target::Target,
+  ty::Type,
 };
 
 pub mod api;

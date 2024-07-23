@@ -50,6 +50,20 @@ pub(crate) enum Error {
   },
 }
 
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum Status {
+  Done,
+}
+
+impl Status {
+  fn error_code(self) -> quinn::VarInt {
+    quinn::VarInt::from_u32(match self {
+      Self::Done => 0,
+    })
+  }
+}
+
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 pub(crate) struct Node {
@@ -146,11 +160,6 @@ impl Node {
           .send(peer, &mut tx, Message::Nodes(self.routes(hash).await))
           .await?
       }
-
-      Message::Nodes(_) => {
-        todo!()
-      }
-      Message::Ping => self.send(peer, &mut tx, Message::Pong).await?,
       Message::Pong => todo!(),
       Message::Store(hash) => {
         self
@@ -161,9 +170,13 @@ impl Node {
           .or_default()
           .insert(peer);
       }
+      Message::Ping => self.send(peer, &mut tx, Message::Pong).await?,
+      Message::Nodes(_) => {
+        todo!()
+      }
     }
 
-    Self::finish(peer, connection, tx).await?;
+    Self::finish(connection, peer, Status::Done, tx).await?;
 
     Ok(())
   }
@@ -236,15 +249,20 @@ impl Node {
 
     self.update(peer).await;
 
-    Self::finish(peer, connection, tx).await?;
+    Self::finish(connection, peer, Status::Done, tx).await?;
 
     Ok(())
   }
 
-  async fn finish(peer: Peer, connection: Connection, mut tx: SendStream) -> Result {
+  async fn finish(
+    connection: Connection,
+    peer: Peer,
+    status: Status,
+    mut tx: SendStream,
+  ) -> Result {
     tx.stopped().await.context(StopError { peer })?;
 
-    connection.close(quinn::VarInt::from_u32(0), b"done");
+    connection.close(status.error_code(), &status.to_cbor());
 
     Ok(())
   }

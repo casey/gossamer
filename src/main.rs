@@ -18,7 +18,7 @@ use {
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
   libc::EXIT_FAILURE,
-  media::{Cbor, Hash, Manifest, Media, Peer, Target, Type},
+  media::{FromCbor, Hash, Manifest, Media, Peer, Target, ToCbor, Type},
   mime_guess::{mime, Mime},
   quinn::{Connection, Endpoint, Incoming, RecvStream, SendStream},
   rand::Rng,
