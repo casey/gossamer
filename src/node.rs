@@ -54,12 +54,14 @@ pub(crate) enum Error {
 #[serde(rename_all = "snake_case")]
 enum Status {
   Done,
+  UnexpectedMessage(&'static str),
 }
 
 impl Status {
   fn error_code(self) -> quinn::VarInt {
     quinn::VarInt::from_u32(match self {
       Self::Done => 0,
+      Self::UnexpectedMessage(_) => 1,
     })
   }
 }
@@ -158,9 +160,9 @@ impl Node {
       Message::FindNode(hash) => {
         self
           .send(peer, &mut tx, Message::Nodes(self.routes(hash).await))
-          .await?
+          .await?;
+        Self::finish(connection, peer, Status::Done, tx).await?;
       }
-      Message::Pong => todo!(),
       Message::Store(hash) => {
         self
           .directory
@@ -169,14 +171,19 @@ impl Node {
           .entry(hash)
           .or_default()
           .insert(peer);
+        Self::finish(connection, peer, Status::Done, tx).await?;
       }
       Message::Ping => self.send(peer, &mut tx, Message::Pong).await?,
-      Message::Nodes(_) => {
-        todo!()
+      message @ (Message::Nodes(_) | Message::Pong) => {
+        Self::finish(
+          connection,
+          peer,
+          Status::UnexpectedMessage(message.into()),
+          tx,
+        )
+        .await?
       }
     }
-
-    Self::finish(connection, peer, Status::Done, tx).await?;
 
     Ok(())
   }

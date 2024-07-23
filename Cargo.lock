@@ -637,6 +637,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "snafu",
+ "strum",
  "tempfile",
  "tokio",
  "tower-http",

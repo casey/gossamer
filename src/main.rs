@@ -45,6 +45,7 @@ use {
       Arc,
     },
   },
+  strum::IntoStaticStr,
   tokio::sync::RwLock,
   walkdir::WalkDir,
 };
