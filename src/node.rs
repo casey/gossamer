@@ -82,7 +82,6 @@ pub(crate) struct Node {
 impl Node {
   pub(crate) async fn new(address: IpAddr, port: u16) -> Result<Self> {
     let mut rng = rand::thread_rng();
-
     let id = Hash::from(std::array::from_fn(|_| rng.gen()));
 
     let endpoint = passthrough::Session::endpoint(id, address, port);
@@ -109,13 +108,7 @@ impl Node {
     }
   }
 
-  pub(crate) async fn run(self: Arc<Self>, bootstrap: Option<Peer>) -> Result {
-    if let Some(bootstrap) = bootstrap {
-      if let Err(err) = self.ping(bootstrap).await {
-        err.report();
-      }
-    }
-
+  pub(crate) async fn run(self: Arc<Self>) -> Result {
     while let Some(incoming) = self.endpoint.accept().await {
       let clone = self.clone();
       tokio::spawn(async move {
@@ -152,7 +145,7 @@ impl Node {
 
     let message = self.receive(peer, rx).await?;
 
-    self.update(peer).await;
+    self.update(peer).await?;
 
     self.received.fetch_add(1, atomic::Ordering::Relaxed);
 
@@ -228,14 +221,44 @@ impl Node {
     Message::from_cbor(&buffer).context(DeserializeError { peer })
   }
 
-  // pub(crate) async fn store(&self, hash: Hash) -> io::Result<()> {
-  //   for contact in self.routes(hash).await {
-  //     self.send(contact, Payload::Store(hash)).await?;
-  //   }
-  //   Ok(())
-  // }
+  pub(crate) async fn connect(&self, peer: Peer) -> Result<Connection> {
+    let connection = self
+      .endpoint
+      .connect(peer.socket_addr(), &peer.id.to_string())
+      .context(ConnectError { peer })?
+      .await
+      .context(ConnectionError { peer })?;
+
+    assert_eq!(passthrough::Session::peer_identity(&connection), peer.id);
+
+    self.update(peer).await?;
+
+    Ok(connection)
+  }
+
+  pub(crate) async fn store(&self, hash: Hash) -> Result {
+    for peer in self.routes(hash).await {
+      let connection = self.connect(peer).await?;
+
+      let (mut tx, _rx) = connection
+        .open_bi()
+        .await
+        .context(ConnectionError { peer })?;
+
+      self.send(peer, &mut tx, Message::Store(hash)).await?;
+
+      Self::finish(connection, peer, Status::Done, tx).await?;
+    }
+    Ok(())
+  }
 
   async fn ping(&self, peer: Peer) -> Result {
+    self.check(peer).await?;
+    self.update(peer).await?;
+    Ok(())
+  }
+
+  async fn check(&self, peer: Peer) -> Result {
     let connection = self
       .endpoint
       .connect(peer.socket_addr(), &peer.id.to_string())
@@ -253,8 +276,6 @@ impl Node {
     self.send(peer, &mut tx, Message::Ping).await?;
 
     assert!(matches!(self.receive(peer, rx).await?, Message::Pong));
-
-    self.update(peer).await;
 
     Self::finish(connection, peer, Status::Done, tx).await?;
 
@@ -277,24 +298,32 @@ impl Node {
   async fn routes(&self, id: Hash) -> Vec<Peer> {
     let i = Distance::new(self.id, id).bucket();
 
+    let mut heap = BinaryHeap::<(Distance, Peer)>::new();
+
     let routing_table = self.routing_table.read().await;
 
-    let mut peers = iter::once(&routing_table[i])
+    for bucket in iter::once(&routing_table[i])
       .chain(routing_table[..i].iter().rev())
       .chain(&routing_table[i + 1..])
-      .flat_map(|bucket| bucket.iter())
-      .take(K)
-      .copied()
-      .collect::<Vec<Peer>>();
+    {
+      for peer in bucket {
+        heap.push((Distance::new(id, peer.id), *peer));
 
-    peers.sort_by_key(|peer| Distance::new(id, peer.id));
+        if heap.len() > K {
+          heap.pop();
+        }
+      }
+    }
 
-    peers
+    heap
+      .into_sorted_vec()
+      .into_iter()
+      .map(|(_distance, peer)| peer)
+      .collect()
   }
 
-  async fn update(&self, peer: Peer) {
+  pub(crate) async fn update(&self, peer: Peer) -> Result {
     let i = Distance::new(self.id, peer.id).bucket();
-
     let bucket = &mut self.routing_table.write().await[i];
 
     if let Some(i) = bucket.iter().copied().position(|c| c == peer) {
@@ -303,8 +332,17 @@ impl Node {
     } else if bucket.len() < K {
       bucket.push(peer);
     } else {
-      eprintln!("routing table bucket {i} full, dropping contact")
+      let oldest = bucket.remove(0);
+      match self.check(oldest).await {
+        Ok(()) => bucket.push(oldest),
+        Err(err) => {
+          log::trace!("peer {oldest} did not respond: {err}");
+          bucket.push(peer);
+        }
+      }
     }
+
+    Ok(())
   }
 }
 
@@ -313,22 +351,43 @@ mod tests {
   use {super::*, std::net::Ipv4Addr};
 
   #[tokio::test]
-  async fn bootstrap() -> Result {
-    env_logger::init();
-
+  async fn ping() -> Result {
     let loopback = Ipv4Addr::new(127, 0, 0, 1).into();
 
-    let bootstrap = Arc::new(Node::new(loopback, 0).await?);
+    let a = Arc::new(Node::new(loopback, 0).await?);
 
-    tokio::spawn(bootstrap.clone().run(None));
+    tokio::spawn(a.clone().run());
 
-    let node = Node::new(loopback, 0).await?;
+    let b = Node::new(loopback, 0).await?;
 
-    node.ping(bootstrap.peer()).await?;
+    b.ping(a.peer()).await?;
 
-    assert_eq!(bootstrap.routes(node.id).await, &[node.peer()]);
+    assert_eq!(a.routes(b.id).await, &[b.peer()]);
 
-    assert_eq!(node.routes(bootstrap.id).await, &[bootstrap.peer()]);
+    assert_eq!(b.routes(a.id).await, &[a.peer()]);
+
+    Ok(())
+  }
+
+  #[tokio::test]
+  async fn store() -> Result {
+    let loopback = Ipv4Addr::new(127, 0, 0, 1).into();
+
+    let a = Arc::new(Node::new(loopback, 0).await?);
+
+    tokio::spawn(a.clone().run());
+
+    let b = Node::new(loopback, 0).await?;
+
+    b.update(a.peer()).await?;
+
+    b.store(a.id).await?;
+
+    assert_eq!(a.routes(b.id).await, &[b.peer()]);
+
+    assert_eq!(b.routes(a.id).await, &[a.peer()]);
+
+    assert!(a.directory.read().await[&a.id].contains(&b.peer()));
 
     Ok(())
   }

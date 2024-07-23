@@ -30,7 +30,7 @@ use {
     any::Any,
     backtrace::{Backtrace, BacktraceStatus},
     cmp::Ordering,
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BinaryHeap, HashMap, HashSet},
     fmt::Display,
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},

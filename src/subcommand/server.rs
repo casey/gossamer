@@ -118,16 +118,21 @@ impl Server {
       );
 
       let clone = node.clone();
-
       tokio::spawn(async move {
-        if let Err(err) = clone.run(self.bootstrap).await {
+        if let Some(bootstrap) = self.bootstrap {
+          if let Err(err) = clone.update(bootstrap).await {
+            eprintln!("update error: {err}");
+          }
+        }
+
+        if let Err(err) = clone.run().await {
           eprintln!("node error: {err}");
         }
       });
 
-      // for hash in library.packages().keys() {
-      //   node.store(*hash).await.unwrap();
-      // }
+      for hash in library.packages().keys() {
+        node.store(*hash).await.unwrap();
+      }
 
       axum_server::Server::bind((self.address, self.http_port).into())
         .serve(
