@@ -47,12 +47,8 @@ pub(crate) struct Server {
   packages: Vec<Utf8PathBuf>,
   #[arg(long, help = "Open server in browser.")]
   open: bool,
-  #[arg(
-    long,
-    help = "Bootstrap DHT node with <CONTACT>.",
-    value_name = "<CONTACT>"
-  )]
-  bootstrap: Option<Contact>,
+  #[arg(long, help = "Bootstrap DHT node with <PEER>.", value_name = "<PEER>")]
+  bootstrap: Option<Peer>,
 }
 
 type HashPath = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>, String)>;
@@ -237,7 +233,7 @@ impl Server {
 
   async fn node(node: Extension<Arc<Node>>) -> Cbor<media::api::Node> {
     Cbor(media::api::Node {
-      contact: node.contact,
+      peer: node.peer(),
       directory: node.directory.read().await.clone(),
       received: node.received.load(atomic::Ordering::Relaxed),
       routing_table: node.routing_table.read().await.clone(),

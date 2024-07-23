@@ -4,7 +4,7 @@ use super::*;
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Message {
   FindNode(Hash),
-  Nodes(Vec<Contact>),
+  Nodes(Vec<Peer>),
   Ping,
   Pong,
   Store(Hash),

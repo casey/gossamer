@@ -2,9 +2,9 @@ use super::*;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Node {
-  pub contact: Contact,
-  pub directory: HashMap<Hash, HashSet<Contact>>,
+  pub peer: Peer,
+  pub directory: HashMap<Hash, HashSet<Peer>>,
   pub received: u64,
-  pub routing_table: Vec<Vec<Contact>>,
+  pub routing_table: Vec<Vec<Peer>>,
   pub sent: u64,
 }

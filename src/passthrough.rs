@@ -179,6 +179,10 @@ impl Session {
 
     endpoint
   }
+
+  pub(crate) fn peer_identity(connection: &Connection) -> Hash {
+    *connection.peer_identity().unwrap().downcast().unwrap()
+  }
 }
 
 impl crypto::Session for Session {

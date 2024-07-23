@@ -4,8 +4,8 @@ use {
   self::{
     deserialize_from_str::DeserializeFromStr, distance::Distance, error::Error, into_u64::IntoU64,
     library::Library, message::Message, metadata::Metadata, node::Node, package::Package,
-    passthrough::Session, path_ext::PathExt, read_ext::ReadExt, report::Report,
-    subcommand::Subcommand, template::Template, write_ext::WriteExt,
+    path_ext::PathExt, read_ext::ReadExt, report::Report, subcommand::Subcommand,
+    template::Template, write_ext::WriteExt,
   },
   axum::{
     body::Body,
@@ -18,9 +18,9 @@ use {
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
   libc::EXIT_FAILURE,
-  media::{Cbor, Contact, Hash, Manifest, Media, Target, Type},
+  media::{Cbor, Hash, Manifest, Media, Peer, Target, Type},
   mime_guess::{mime, Mime},
-  quinn::{Endpoint, Incoming, RecvStream, SendStream},
+  quinn::{Connection, Endpoint, Incoming, RecvStream, SendStream},
   rand::Rng,
   regex::Regex,
   regex_static::{lazy_regex, once_cell::sync::Lazy},

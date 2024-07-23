@@ -1,7 +1,4 @@
-use {
-  super::*,
-  quinn::{Connection, VarInt},
-};
+use super::*;
 
 // Number of buckets in a node's routing table. For each bucket with position
 // `i` in the routing table, we store nodes at distance `i` from ourselves.
@@ -9,32 +6,27 @@ use {
 // at distance 0,
 const BUCKETS: usize = 257;
 
-pub(crate) struct Node {
-  pub(crate) contact: Contact,
-  pub(crate) directory: RwLock<HashMap<Hash, HashSet<Contact>>>,
-  pub(crate) endpoint: Endpoint,
-  pub(crate) received: AtomicU64,
-  pub(crate) routing_table: RwLock<Vec<Vec<Contact>>>,
-  pub(crate) sent: AtomicU64,
-}
-
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(Error)))]
 pub(crate) enum Error {
   Accept {
+    address: SocketAddr,
     backtrace: Option<Backtrace>,
     source: quinn::ConnectionError,
   },
   Connect {
     backtrace: Option<Backtrace>,
+    peer: Peer,
     source: quinn::ConnectError,
   },
   Connection {
     backtrace: Option<Backtrace>,
+    peer: Peer,
     source: quinn::ConnectionError,
   },
-  DeserializeError {
+  Deserialize {
     backtrace: Option<Backtrace>,
+    peer: Peer,
     source: ciborium::de::Error<io::Error>,
   },
   LocalAddress {
@@ -43,15 +35,33 @@ pub(crate) enum Error {
   },
   Read {
     backtrace: Option<Backtrace>,
+    peer: Peer,
     source: quinn::ReadExactError,
+  },
+  Stop {
+    backtrace: Option<Backtrace>,
+    peer: Peer,
+    source: quinn::StoppedError,
   },
   Write {
     backtrace: Option<Backtrace>,
+    peer: Peer,
     source: quinn::WriteError,
   },
 }
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;
+
+pub(crate) struct Node {
+  pub(crate) directory: RwLock<HashMap<Hash, HashSet<Peer>>>,
+  pub(crate) endpoint: Endpoint,
+  pub(crate) id: Hash,
+  pub(crate) ip: IpAddr,
+  pub(crate) port: u16,
+  pub(crate) received: AtomicU64,
+  pub(crate) routing_table: RwLock<Vec<Vec<Peer>>>,
+  pub(crate) sent: AtomicU64,
+}
 
 impl Node {
   pub(crate) async fn new(address: IpAddr, port: u16) -> Result<Self> {
@@ -59,25 +69,31 @@ impl Node {
 
     let id = Hash::from(std::array::from_fn(|_| rng.gen()));
 
-    let endpoint = Session::endpoint(id, address, port);
+    let endpoint = passthrough::Session::endpoint(id, address, port);
 
     let socket_address = endpoint.local_addr().context(LocalAddressError)?;
 
     Ok(Self {
-      contact: Contact {
-        address: socket_address.ip(),
-        port: socket_address.port(),
-        id,
-      },
       directory: RwLock::default(),
       endpoint,
+      id,
+      ip: socket_address.ip(),
+      port: socket_address.port(),
       received: AtomicU64::default(),
       routing_table: RwLock::new((0..=BUCKETS).map(|_| Default::default()).collect()),
       sent: AtomicU64::default(),
     })
   }
 
-  pub(crate) async fn run(self: Arc<Self>, bootstrap: Option<Contact>) -> Result {
+  pub(crate) fn peer(&self) -> Peer {
+    Peer {
+      id: self.id,
+      ip: self.ip,
+      port: self.port,
+    }
+  }
+
+  pub(crate) async fn run(self: Arc<Self>, bootstrap: Option<Peer>) -> Result {
     if let Some(bootstrap) = bootstrap {
       if let Err(err) = self.ping(bootstrap).await {
         err.report();
@@ -97,39 +113,44 @@ impl Node {
   }
 
   async fn accept(self: Arc<Self>, incoming: Incoming) -> Result {
+    let address = incoming.remote_address();
+
     let connection = incoming
       .accept()
-      .context(AcceptError)?
+      .context(AcceptError { address })?
       .await
-      .context(AcceptError)?;
+      .context(AcceptError { address })?;
 
-    let from = connection.remote_address();
+    let socket_addr = connection.remote_address();
 
-    let (mut tx, rx) = connection.accept_bi().await.context(AcceptError)?;
-
-    let message = self.receive(rx).await?;
-
-    let from = Contact {
-      address: from.ip(),
-      id: *connection.peer_identity().unwrap().downcast().unwrap(),
-      port: from.port(),
+    let peer = Peer {
+      ip: socket_addr.ip(),
+      id: passthrough::Session::peer_identity(&connection),
+      port: socket_addr.port(),
     };
 
-    self.update(from).await;
+    let (mut tx, rx) = connection
+      .accept_bi()
+      .await
+      .context(AcceptError { address })?;
+
+    let message = self.receive(peer, rx).await?;
+
+    self.update(peer).await;
 
     self.received.fetch_add(1, atomic::Ordering::Relaxed);
 
     match message {
       Message::FindNode(hash) => {
         self
-          .send(&mut tx, Message::Nodes(self.routes(hash).await))
+          .send(peer, &mut tx, Message::Nodes(self.routes(hash).await))
           .await?
       }
 
       Message::Nodes(_) => {
         todo!()
       }
-      Message::Ping => self.send(&mut tx, Message::Pong).await?,
+      Message::Ping => self.send(peer, &mut tx, Message::Pong).await?,
       Message::Pong => todo!(),
       Message::Store(hash) => {
         self
@@ -138,16 +159,16 @@ impl Node {
           .await
           .entry(hash)
           .or_default()
-          .insert(from);
+          .insert(peer);
       }
     }
 
-    Self::finish(connection, tx).await;
+    Self::finish(peer, connection, tx).await?;
 
     Ok(())
   }
 
-  async fn send(&self, stream: &mut SendStream, message: Message) -> Result {
+  async fn send(&self, peer: Peer, stream: &mut SendStream, message: Message) -> Result {
     let message = message.to_cbor();
 
     assert!(message.len() < u16::MAX as usize);
@@ -157,29 +178,34 @@ impl Node {
     stream
       .write_all(&len.to_le_bytes())
       .await
-      .context(WriteError)?;
+      .context(WriteError { peer })?;
 
-    stream.write_all(&message).await.context(WriteError)?;
+    stream
+      .write_all(&message)
+      .await
+      .context(WriteError { peer })?;
 
-    stream.stopped().await.unwrap();
+    stream.stopped().await.context(StopError { peer })?;
 
     self.sent.fetch_add(1, atomic::Ordering::Relaxed);
 
     Ok(())
   }
 
-  async fn receive(&self, mut rx: RecvStream) -> Result<Message> {
+  async fn receive(&self, peer: Peer, mut rx: RecvStream) -> Result<Message> {
     let mut len = [0; 2];
 
-    rx.read_exact(&mut len).await.context(ReadError)?;
+    rx.read_exact(&mut len).await.context(ReadError { peer })?;
 
     let len = u16::from_le_bytes(len) as usize;
 
     let mut buffer = vec![0; len];
 
-    rx.read_exact(&mut buffer).await.context(ReadError)?;
+    rx.read_exact(&mut buffer)
+      .await
+      .context(ReadError { peer })?;
 
-    Message::from_cbor(&buffer).context(DeserializeError)
+    Message::from_cbor(&buffer).context(DeserializeError { peer })
   }
 
   // pub(crate) async fn store(&self, hash: Hash) -> io::Result<()> {
@@ -189,77 +215,68 @@ impl Node {
   //   Ok(())
   // }
 
-  async fn ping(&self, contact: Contact) -> Result {
+  async fn ping(&self, peer: Peer) -> Result {
     let connection = self
       .endpoint
-      .connect(
-        (contact.address, contact.port).into(),
-        &contact.id.to_string(),
-      )
-      .context(ConnectError)?
+      .connect(peer.socket_addr(), &peer.id.to_string())
+      .context(ConnectError { peer })?
       .await
-      .context(ConnectionError)?;
+      .context(ConnectionError { peer })?;
 
-    assert_eq!(
-      *connection
-        .peer_identity()
-        .unwrap()
-        .downcast::<Hash>()
-        .unwrap(),
-      contact.id,
-    );
+    assert_eq!(passthrough::Session::peer_identity(&connection), peer.id);
 
-    let (mut tx, rx) = connection.open_bi().await.context(ConnectionError)?;
+    let (mut tx, rx) = connection
+      .open_bi()
+      .await
+      .context(ConnectionError { peer })?;
 
-    self.send(&mut tx, Message::Ping).await?;
+    self.send(peer, &mut tx, Message::Ping).await?;
 
-    assert!(matches!(self.receive(rx).await?, Message::Pong));
+    assert!(matches!(self.receive(peer, rx).await?, Message::Pong));
 
-    self.update(contact).await;
+    self.update(peer).await;
 
-    Self::finish(connection, tx).await;
+    Self::finish(peer, connection, tx).await?;
 
     Ok(())
   }
 
-  async fn finish(connection: Connection, mut tx: SendStream) {
-    tx.stopped().await.unwrap();
+  async fn finish(peer: Peer, connection: Connection, mut tx: SendStream) -> Result {
+    tx.stopped().await.context(StopError { peer })?;
 
-    connection.close(VarInt::from_u32(0), b"done");
+    connection.close(quinn::VarInt::from_u32(0), b"done");
+
+    Ok(())
   }
 
-  async fn routes(&self, id: Hash) -> Vec<Contact> {
-    let i = Distance::new(self.id(), id).bucket();
+  async fn routes(&self, id: Hash) -> Vec<Peer> {
+    let i = Distance::new(self.id, id).bucket();
 
     let routing_table = self.routing_table.read().await;
 
-    let mut contacts = iter::once(&routing_table[i])
+    let mut peers = iter::once(&routing_table[i])
       .chain(routing_table[..i].iter().rev())
       .chain(&routing_table[i + 1..])
       .flat_map(|bucket| bucket.iter())
       .take(K)
       .copied()
-      .collect::<Vec<Contact>>();
+      .collect::<Vec<Peer>>();
 
-    contacts.sort_by_key(|contact| Distance::new(id, contact.id));
+    peers.sort_by_key(|peer| Distance::new(id, peer.id));
 
-    contacts
+    peers
   }
 
-  fn id(&self) -> Hash {
-    self.contact.id
-  }
-
-  async fn update(&self, contact: Contact) {
-    let i = Distance::new(self.id(), contact.id).bucket();
+  async fn update(&self, peer: Peer) {
+    let i = Distance::new(self.id, peer.id).bucket();
 
     let bucket = &mut self.routing_table.write().await[i];
 
-    if let Some(i) = bucket.iter().copied().position(|c| c == contact) {
+    if let Some(i) = bucket.iter().copied().position(|c| c == peer) {
       bucket.remove(i);
-      bucket.push(contact);
+      bucket.push(peer);
     } else if bucket.len() < K {
-      bucket.push(contact);
+      bucket.push(peer);
     } else {
       eprintln!("routing table bucket {i} full, dropping contact")
     }
@@ -282,11 +299,11 @@ mod tests {
 
     let node = Node::new(loopback, 0).await?;
 
-    node.ping(bootstrap.contact).await?;
+    node.ping(bootstrap.peer()).await?;
 
-    assert_eq!(bootstrap.routes(node.id()).await, &[node.contact]);
+    assert_eq!(bootstrap.routes(node.id).await, &[node.peer()]);
 
-    assert_eq!(node.routes(bootstrap.id()).await, &[bootstrap.contact]);
+    assert_eq!(node.routes(bootstrap.id).await, &[bootstrap.peer()]);
 
     Ok(())
   }

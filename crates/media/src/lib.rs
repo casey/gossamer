@@ -13,15 +13,14 @@ use {
 };
 
 pub use {
-  cbor::Cbor, contact::Contact, hash::Hash, manifest::Manifest, media::Media, target::Target,
-  ty::Type,
+  cbor::Cbor, hash::Hash, manifest::Manifest, media::Media, peer::Peer, target::Target, ty::Type,
 };
 
 pub mod api;
 mod cbor;
-mod contact;
 mod hash;
 mod manifest;
 mod media;
+mod peer;
 mod target;
 mod ty;
