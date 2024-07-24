@@ -37,6 +37,7 @@ use {
     iter,
     net::{IpAddr, SocketAddr},
     num::{ParseIntError, TryFromIntError},
+    ops::{Deref, DerefMut},
     path::PathBuf,
     process, str,
     str::FromStr,

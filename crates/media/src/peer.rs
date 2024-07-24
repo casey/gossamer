@@ -74,4 +74,19 @@ mod tests {
       },
     );
   }
+
+  #[test]
+  fn serde() {
+    let peer = Peer {
+      port: 5,
+      id: "0f89ce0b671f7277b105035ea88341a81c5fceaed092eab29721fe6f86807133"
+        .parse()
+        .unwrap(),
+      ip: Ipv4Addr::new(1, 2, 3, 4).into(),
+    };
+
+    let cbor = peer.to_cbor();
+
+    assert_eq!(Peer::from_cbor(&cbor).unwrap(), peer);
+  }
 }

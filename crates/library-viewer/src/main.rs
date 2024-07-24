@@ -1,5 +1,8 @@
 use {
-  self::library::Library,
+  self::{
+    library::Library,
+    templates::{NodeHtml, SearchHtml},
+  },
   hypermedia::{
     boilerplate::Boilerplate,
     html_escaper::Escape,
@@ -8,8 +11,11 @@ use {
     media::{Hash, Manifest, Target, Type},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
     wasm_bindgen_futures,
-    web_sys::{self, HtmlButtonElement, HtmlElement, HtmlIFrameElement, PointerEvent, ShadowRoot},
-    Api, Component, Error, EventTargetExt, Select,
+    web_sys::{
+      self, HtmlButtonElement, HtmlDivElement, HtmlElement, HtmlIFrameElement, HtmlInputElement,
+      InputEvent, PointerEvent, ShadowRoot,
+    },
+    Api, Cast, Component, Error, EventTargetExt, SelectDocumentFragment, SelectElement,
   },
   std::{collections::BTreeMap, fmt::Display},
 };
@@ -18,6 +24,7 @@ use {
 use hypermedia::debug;
 
 mod library;
+mod templates;
 
 #[wasm_bindgen(main)]
 async fn main() -> Result<(), JsValue> {

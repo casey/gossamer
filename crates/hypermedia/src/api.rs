@@ -31,6 +31,10 @@ impl Api {
     self.get("api/node").await
   }
 
+  pub async fn search(&self, hash: Hash) -> Result<Option<Peer>, Error> {
+    self.get(&format!("api/search/{hash}")).await
+  }
+
   async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, Error> {
     let url = self.base.join(path).unwrap();
 

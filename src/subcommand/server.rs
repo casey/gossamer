@@ -139,9 +139,10 @@ impl Server {
           Router::new()
             .route("/", get(Self::root))
             .route("/favicon.ico", get(Self::favicon))
-            .route("/api/packages", get(Self::packages))
             .route("/api/handlers", get(Self::handlers))
             .route("/api/node", get(Self::node))
+            .route("/api/packages", get(Self::packages))
+            .route("/api/search/:hash", get(Self::search))
             .route("/app/*path", get(Self::root_app))
             .route("/:app/:content/", get(Self::app_root))
             .route("/:app/:content/api/manifest", get(Self::manifest))
@@ -230,6 +231,13 @@ impl Server {
         .map(|(hash, package)| (*hash, package.manifest.clone()))
         .collect(),
     )
+  }
+
+  async fn search(
+    node: Extension<Arc<Node>>,
+    id: Path<DeserializeFromStr<Hash>>,
+  ) -> Cbor<Option<Peer>> {
+    Cbor(node.search(**id).await)
   }
 
   async fn handlers(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Target, Hash>> {

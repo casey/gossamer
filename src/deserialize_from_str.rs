@@ -16,6 +16,22 @@ where
   }
 }
 
+impl<T: FromStr> Deref for DeserializeFromStr<T> {
+  type Target = T;
+
+  #[inline]
+  fn deref(&self) -> &Self::Target {
+    &self.0
+  }
+}
+
+impl<T: FromStr> DerefMut for DeserializeFromStr<T> {
+  #[inline]
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.0
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

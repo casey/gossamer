@@ -10,10 +10,13 @@ hypermedia = { path = "../hypermedia" }
 [dependencies.web-sys]
 version = "0.3"
 features = [
+  "CssStyleDeclaration",
   "Document",
   "DomStringMap",
-  "PointerEvent",
   "HtmlButtonElement",
+  "HtmlDivElement",
   "HtmlIFrameElement",
-  "CssStyleDeclaration",
+  "HtmlInputElement",
+  "InputEvent",
+  "PointerEvent",
 ]

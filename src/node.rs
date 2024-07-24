@@ -322,6 +322,20 @@ impl Node {
       .collect()
   }
 
+  pub(crate) async fn search(&self, id: Hash) -> Option<Peer> {
+    let routing_table = self.routing_table.read().await;
+
+    for bucket in routing_table.iter() {
+      for peer in bucket {
+        if peer.id == id {
+          return Some(*peer);
+        }
+      }
+    }
+
+    None
+  }
+
   pub(crate) async fn update(&self, peer: Peer) -> Result {
     let i = Distance::new(self.id, peer.id).bucket();
     let bucket = &mut self.routing_table.write().await[i];

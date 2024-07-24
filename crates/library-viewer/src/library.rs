@@ -20,9 +20,30 @@ fn show_app(section: &HtmlElement, iframe: &HtmlIFrameElement) {
 
 impl Library {
   async fn node(section: HtmlElement, iframe: HtmlIFrameElement) -> Result<JsValue, JsValue> {
+    log::info!("node");
     let node = Api::default().node().await?;
-    log::info!("{node:?}");
     NodeHtml(node).render(&section);
+    show_system(&section, &iframe);
+    Ok(JsValue::UNDEFINED)
+  }
+
+  async fn search(section: HtmlElement, iframe: HtmlIFrameElement) -> Result<JsValue, JsValue> {
+    SearchHtml.render(&section);
+    let input = section.select::<HtmlInputElement>("input");
+    let div = section.select::<HtmlDivElement>("div");
+    input.add_event_listener("input", move |event: InputEvent| -> Promise {
+      wasm_bindgen_futures::future_to_promise(async move {
+        let value = event.target().unwrap().cast::<HtmlInputElement>().value();
+        log::info!("{value}");
+        if let Ok(hash) = value.parse::<Hash>() {
+          let peer = Api::default().search(hash).await?;
+          // - temporarily view and search peer
+          // - add peer to sidebar
+          log::info!("{peer:?}");
+        }
+        Ok(JsValue::UNDEFINED)
+      })
+    });
     show_system(&section, &iframe);
     Ok(JsValue::UNDEFINED)
   }
@@ -35,9 +56,6 @@ trait Render: Display {
 }
 
 impl<T: Display> Render for T {}
-
-#[derive(Boilerplate)]
-struct NodeHtml(hypermedia::media::api::Node);
 
 impl Component for Library {
   fn name() -> &'static str {
@@ -84,11 +102,26 @@ impl Component for Library {
       });
     }
 
-    self
-      .root
-      .select::<HtmlButtonElement>("button#node")
-      .add_event_listener("click", move |_: PointerEvent| -> Promise {
-        wasm_bindgen_futures::future_to_promise(Self::node(section.clone(), iframe.clone()))
-      });
+    {
+      let iframe = iframe.clone();
+      let section = section.clone();
+      self
+        .root
+        .select::<HtmlButtonElement>("button#node")
+        .add_event_listener("click", move |_: PointerEvent| -> Promise {
+          wasm_bindgen_futures::future_to_promise(Self::node(section.clone(), iframe.clone()))
+        });
+    }
+
+    {
+      let iframe = iframe.clone();
+      let section = section.clone();
+      self
+        .root
+        .select::<HtmlButtonElement>("button#search")
+        .add_event_listener("click", move |_: PointerEvent| -> Promise {
+          wasm_bindgen_futures::future_to_promise(Self::search(section.clone(), iframe.clone()))
+        });
+    }
   }
 }

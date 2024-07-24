@@ -5,7 +5,7 @@ use {
   boilerplate::Boilerplate,
   html_escaper::Escape,
   js_sys::Promise,
-  media::{Hash, Manifest, Target, Type},
+  media::{Hash, Manifest, Peer, Target, Type},
   reqwest::{StatusCode, Url},
   serde::de::DeserializeOwned,
   snafu::{ensure, ResultExt, Snafu},
@@ -21,15 +21,19 @@ use {
     JsCast, JsError, JsValue,
   },
   web_sys::{
-    DocumentFragment, DomParser, EventTarget, HtmlElement, ShadowRoot, ShadowRootInit,
+    DocumentFragment, DomParser, Element, EventTarget, HtmlElement, ShadowRoot, ShadowRootInit,
     ShadowRootMode, SupportedType,
   },
 };
 
 pub use {
   self::{
-    api::Api, cast::Cast, component::Component, error::Error, event_target_ext::EventTargetExt,
-    select::Select,
+    api::Api,
+    cast::Cast,
+    component::Component,
+    error::Error,
+    event_target_ext::EventTargetExt,
+    select::{SelectDocumentFragment, SelectElement},
   },
   boilerplate, html_escaper, js_sys, log, media, wasm_bindgen, wasm_bindgen_futures, web_sys,
 };
