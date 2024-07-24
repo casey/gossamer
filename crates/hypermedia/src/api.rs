@@ -35,6 +35,14 @@ impl Api {
     self.get(&format!("api/search/{hash}")).await
   }
 
+  pub async fn bookmark(&self, peer: Peer) -> Result<(), Error> {
+    self.get(&format!("api/bookmark/{peer}")).await
+  }
+
+  pub async fn bookmarks(&self) -> Result<BTreeSet<Hash>, Error> {
+    self.get(&format!("api/bookmarks")).await
+  }
+
   async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, Error> {
     let url = self.base.join(path).unwrap();
 

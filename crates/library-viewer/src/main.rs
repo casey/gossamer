@@ -17,7 +17,7 @@ use {
     },
     Api, Cast, Component, Error, EventTargetExt, SelectDocumentFragment, SelectElement,
   },
-  std::{collections::BTreeMap, fmt::Display},
+  std::{collections::BTreeMap, fmt::Display, sync::Arc},
 };
 
 #[allow(unused)]

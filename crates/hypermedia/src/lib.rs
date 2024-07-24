@@ -10,7 +10,7 @@ use {
   serde::de::DeserializeOwned,
   snafu::{ensure, ResultExt, Snafu},
   std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fmt::Display,
     io::{self, Cursor},
     ops::Deref,
