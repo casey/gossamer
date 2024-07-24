@@ -37,6 +37,7 @@ impl Library {
         log::info!("{value}");
         if let Ok(hash) = value.parse::<Hash>() {
           let peer = Api::default().search(hash).await?;
+          // - get peer info
           // - temporarily view and search peer
           // - add peer to sidebar
           log::info!("{peer:?}");
