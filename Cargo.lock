@@ -942,6 +942,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kurbo"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e5aa9f0f96a938266bdb12928a67169e8d22c6a786fda8ed984b85e6ba93c3c"
+dependencies = [
+ "arrayvec",
+ "smallvec",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -953,6 +963,7 @@ version = "0.0.0"
 dependencies = [
  "hypermedia",
  "web-sys",
+ "xilem_web",
 ]
 
 [[package]]
@@ -1182,6 +1193,16 @@ checksum = "8e459365e590736a54c3fa561947c84837534b8e9af6fc5bf781307e82658fae"
 dependencies = [
  "base64",
  "serde",
+]
+
+[[package]]
+name = "peniko"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c28d7294093837856bb80ad191cc46a2fcec8a30b43b7a3b0285325f0a917a9"
+dependencies = [
+ "kurbo",
+ "smallvec",
 ]
 
 [[package]]
@@ -2423,6 +2444,25 @@ checksum = "a277a57398d4bfa075df44f501a17cfdf8542d224f0d36095a2adc7aee4ef0a5"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "xilem_core"
+version = "0.1.0"
+dependencies = [
+ "kurbo",
+ "tracing",
+]
+
+[[package]]
+name = "xilem_web"
+version = "0.1.0"
+dependencies = [
+ "peniko",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "xilem_core",
 ]
 
 [[package]]
