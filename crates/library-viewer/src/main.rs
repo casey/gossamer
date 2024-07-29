@@ -42,7 +42,7 @@ use {
   },
   std::collections::BTreeMap,
   xilem_web::{
-    concurrent::memoized_await,
+    concurrent::await_once,
     core::fork,
     document_body,
     elements::html,
@@ -139,9 +139,8 @@ impl State {
         )),
       )),
       (
-        memoized_await(
-          (),
-          |()| async {
+        await_once(
+          |_| async {
             Api::default()
               .packages()
               .await
@@ -151,9 +150,8 @@ impl State {
           },
           |state: &mut State, output| state.packages = output,
         ),
-        memoized_await(
-          (),
-          |()| async { Api::default().handlers().await.unwrap() },
+        await_once(
+          |_| async { Api::default().handlers().await.unwrap() },
           |state: &mut State, output| state.handlers = output,
         ),
       ),
