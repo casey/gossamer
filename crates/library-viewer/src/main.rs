@@ -36,9 +36,9 @@
 use {
   hypermedia::{
     log,
-    media::{api, Hash, Manifest, Target, Type},
+    media::{api, Hash, Manifest, Peer, Target, Type},
     wasm_bindgen::{self, prelude::wasm_bindgen, JsValue},
-    Api,
+    Api, Cast,
   },
   std::collections::BTreeMap,
   xilem_web::{
@@ -49,12 +49,14 @@ use {
 #[derive(Debug)]
 struct State {
   handlers: BTreeMap<Target, Hash>,
-  packages: Vec<(Hash, Manifest)>,
-  selection: Option<Selection>,
   node: Option<api::Node>,
+  packages: Vec<(Hash, Manifest)>,
+  query: Option<Hash>,
+  selection: Option<Selection>,
+  results: Option<Option<Peer>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Selection {
   Node,
   Package(Hash, Hash),
@@ -67,7 +69,9 @@ impl State {
       handlers: BTreeMap::new(),
       node: None,
       packages: Vec::new(),
+      query: None,
       selection: None,
+      results: None,
     }
   }
 
@@ -130,7 +134,30 @@ impl State {
                 .attr("src", format!("/{handler}/{content}/"))
                 .boxed(),
             ),
-            Selection::Search => Some(div((h1("Search"), input(()).attr("type", "text"))).boxed()),
+            Selection::Search => Some(
+              div((
+                h1("Search"),
+                input(())
+                  .attr("type", "text")
+                  .on_input(|state: &mut State, event| {
+                    state.query = event
+                      .target()
+                      .unwrap()
+                      .cast::<web_sys::HtmlInputElement>()
+                      .value()
+                      .parse()
+                      .ok();
+                  }),
+                self.results.as_ref().map(|peer| {
+                  div(if let Some(peer) = peer {
+                    peer.to_string()
+                  } else {
+                    "hash not found".to_string()
+                  })
+                }),
+              ))
+              .boxed(),
+            ),
           }
         })),
       )),
@@ -153,9 +180,32 @@ impl State {
           |state: &mut State, output| state.handlers = output,
         ),
         memoized_await(
-          (),
-          |()| async { Api::default().node().await.unwrap() },
-          |state: &mut State, output| state.node = Some(output),
+          self.selection == Some(Selection::Node),
+          |node| {
+            let node = *node;
+            async move {
+              if node {
+                Some(Api::default().node().await.unwrap())
+              } else {
+                None
+              }
+            }
+          },
+          |state: &mut State, output| state.node = output,
+        ),
+        memoized_await(
+          self.query,
+          |query| {
+            let query = *query;
+            async move {
+              if let Some(query) = query {
+                Some(Api::default().search(query).await.unwrap())
+              } else {
+                None
+              }
+            }
+          },
+          |state: &mut State, output| state.results = output,
         ),
       ),
     )
