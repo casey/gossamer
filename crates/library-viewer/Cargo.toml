@@ -5,8 +5,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
+futures = "0.3.30"
 hypermedia = { path = "../hypermedia" }
-xilem_web = { path = "../../../xilem/xilem_web" }
+xilem_web = { git = "https://github.com/linebender/xilem.git" }
 
 [dependencies.web-sys]
 version = "0.3"
