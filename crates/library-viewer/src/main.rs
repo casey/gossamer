@@ -56,8 +56,9 @@ struct State {
 
 #[derive(Debug)]
 enum Selection {
-  Package(Hash, Hash),
   Node,
+  Package(Hash, Hash),
+  Search,
 }
 
 impl State {
@@ -109,6 +110,9 @@ impl State {
       div((
         nav((
           h1("System"),
+          button("Search").on_click(|state: &mut State, _| {
+            state.selection = Some(Selection::Search);
+          }),
           h1("Network"),
           button("Node").on_click(|state: &mut State, _| {
             state.selection = Some(Selection::Node);
@@ -120,12 +124,13 @@ impl State {
         )),
         main(self.selection.as_ref().map(|selection| {
           match selection {
+            Selection::Node => self.node.as_ref().map(|node| self.node(node).boxed()),
             Selection::Package(handler, content) => Some(
               iframe(())
                 .attr("src", format!("/{handler}/{content}/"))
                 .boxed(),
             ),
-            Selection::Node => self.node.as_ref().map(|node| self.node(node).boxed()),
+            Selection::Search => Some(div((h1("Search"), input(()).attr("type", "text"))).boxed()),
           }
         })),
       )),
