@@ -1,5 +1,24 @@
 use super::*;
 
+// # Kademlia RPCs:
+//
+// ## PING
+//
+// sends an empty message to a node and updates its routing table if the node responds
+//
+// ## STORE
+//
+// store a value under a key in a node (usually the senders contact information under a hash)
+//
+// ## FIND_NODE
+//
+// get the K closest nodes to a hash
+//
+// ## FIND_VALUE
+//
+// get the K closed nodes to a hash, unless the node has received a STORE for that hash,
+// in which case it returns the contact infornmation for that hah
+
 // Number of buckets in a node's routing table. For each bucket with position
 // `i` in the routing table, we store nodes at distance `i` from ourselves.
 // Note that this include nodes who have the same ID as our own, which reside
