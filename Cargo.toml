@@ -7,9 +7,6 @@ edition = "2021"
 homepage = "https://github.com/casey/gossamer"
 repository = "https://github.com/casey/gossamer"
 
-[workspace]
-members = [".", "crates/*"]
-
 [dependencies]
 axum = { version = "0.7.5", features = ["http2"] }
 axum-server = "0.6.0"
