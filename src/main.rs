@@ -15,8 +15,10 @@ use {
       Uri,
     },
   },
+  boilerplate::Boilerplate,
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
+  html_escaper::Escape,
   libc::EXIT_FAILURE,
   media::{FromCbor, Hash, Id, Manifest, Media, Peer, Target, ToCbor, Type},
   mime_guess::{mime, Mime},
@@ -72,6 +74,7 @@ mod report;
 mod response;
 mod subcommand;
 mod template;
+mod templates;
 mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;

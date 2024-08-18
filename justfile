@@ -27,39 +27,14 @@ clean:
 open:
   open http://localhost
 
-serve port="80": build (package 'app-viewer') (package 'comic-viewer') (package 'library-viewer')
-  mkdir -p target/packages
+serve port="80": build
   target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
   RUST_LOG=gossamer=trace target/debug/gossamer server \
     --http-port {{port}} \
     --packages \
-      build/app-viewer.package \
-      build/comic-viewer.package \
-      build/library-viewer.package \
       build/test-comic.package
 
-package crate: build files
-  rm -rf build/{{crate}}
-  mkdir -p build/{{crate}}
-  cargo build \
-    --package {{crate}} \
-    --target wasm32-unknown-unknown
-  cp target/wasm32-unknown-unknown/debug/{{crate}}.wasm build/{{crate}}/index.wasm
-  wasm-bindgen \
-    --target web \
-    --no-typescript \
-    build/{{crate}}/index.wasm \
-    --out-dir build/{{crate}}
-  mv build/{{crate}}/index_bg.wasm build/{{crate}}/index.wasm
-  mv build/{{crate}}/index.js build/{{crate}}/loader.js
-  rsync -aqvz --exclude .DS_Store files/ build/files/ crates/{{crate}}/files/ build/{{crate}}/
-  target/debug/gossamer package --root build/{{crate}} --output build/{{crate}}.package
-
-files:
-  test -f build/files/modern-normalize.css || just update-files
-
-update-files:
-  mkdir -p build/files
+update-modern-normalize:
   curl \
     https://raw.githubusercontent.com/sindresorhus/modern-normalize/main/modern-normalize.css \
-    > build/files/modern-normalize.css
+    > static/modern-normalize.css

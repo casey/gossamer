@@ -1,5 +1,5 @@
 use {
-  self::target_validator::TargetValidator,
+  self::{server_error::ServerError, target_validator::TargetValidator},
   super::*,
   axum::{
     extract::{Extension, Path},
@@ -8,6 +8,7 @@ use {
     routing::get,
     Router,
   },
+  rust_embed::RustEmbed,
   tokio::runtime::Runtime,
   tower_http::{
     propagate_header::PropagateHeaderLayer,
@@ -15,6 +16,16 @@ use {
     validate_request::{ValidateRequest, ValidateRequestHeaderLayer},
   },
 };
+
+// todo:
+// - okay_or_not_found
+
+mod server_error;
+mod target_validator;
+
+#[derive(RustEmbed)]
+#[folder = "static"]
+struct StaticAssets;
 
 struct Cbor<T>(T);
 
@@ -26,8 +37,6 @@ impl<T: Serialize> IntoResponse for Cbor<T> {
     ([(header::CONTENT_TYPE, "application/cbor")], cbor).into_response()
   }
 }
-
-mod target_validator;
 
 #[derive(Parser)]
 pub(crate) struct Server {
@@ -79,23 +88,6 @@ impl IntoResponse for Resource {
   }
 }
 
-#[derive(Debug)]
-pub(crate) enum ServerError {
-  NotFound { message: String },
-  Node { source: node::Error },
-}
-
-impl IntoResponse for ServerError {
-  fn into_response(self) -> Response {
-    match self {
-      Self::NotFound { message } => (StatusCode::NOT_FOUND, message).into_response(),
-      Self::Node { source } => {
-        (StatusCode::INTERNAL_SERVER_ERROR, format!("{source:?}")).into_response()
-      }
-    }
-  }
-}
-
 type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 impl Server {
@@ -138,7 +130,13 @@ impl Server {
         .serve(
           Router::new()
             .route("/", get(Self::root))
+            .route("/static/*path", get(Self::static_asset))
             .route("/favicon.ico", get(Self::favicon))
+            .route("/node", get(Self::node_new))
+            .route("/peer/:peer", get(Self::peer))
+            .route("/:package", get(Self::foo))
+            .route("/:package/:file", get(Self::bar))
+            // old:
             .route("/api/handlers", get(Self::handlers))
             .route("/api/node", get(Self::node))
             .route("/api/packages", get(Self::packages))
@@ -148,16 +146,16 @@ impl Server {
             .route("/:app/:content/api/manifest", get(Self::manifest))
             .route("/:app/:content/app/*path", get(Self::app))
             .route("/:app/:content/content/*path", get(Self::content))
-            .layer(PropagateHeaderLayer::new(header::CONTENT_SECURITY_POLICY))
-            .layer(SetRequestHeaderLayer::overriding(
-              header::CONTENT_SECURITY_POLICY,
-              move |request: &http::Request<Body>| {
-                Some(Self::content_security_policy(self.http_port, request.uri()))
-              },
-            ))
-            .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
-              library.clone(),
-            )))
+            // .layer(PropagateHeaderLayer::new(header::CONTENT_SECURITY_POLICY))
+            // .layer(SetRequestHeaderLayer::overriding(
+            //   header::CONTENT_SECURITY_POLICY,
+            //   move |request: &http::Request<Body>| {
+            //     Some(Self::content_security_policy(self.http_port, request.uri()))
+            //   },
+            // ))
+            // .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
+            //   library.clone(),
+            // )))
             .layer(Extension(library))
             .layer(Extension(node))
             .into_make_service(),
@@ -194,33 +192,24 @@ impl Server {
   }
 
   fn package(library: &Library, hash: Hash) -> ServerResult<&Package> {
-    library.package(hash).ok_or_else(|| ServerError::NotFound {
-      message: format!("package {hash} not found"),
-    })
+    library
+      .package(hash)
+      .with_context(|| server_error::NotFound {
+        message: format!("package {hash} not found"),
+      })
   }
 
-  async fn favicon(library: Extension<Arc<Library>>) -> ServerResult {
-    Self::file(
-      library
-        .handler(Target::Root)
-        .ok_or_else(|| ServerError::NotFound {
-          message: "library handler not found".into(),
-        })?,
-      "",
-      "favicon.ico",
-    )
+  async fn favicon() -> ServerResult<Response> {
+    Self::static_asset(Path("favicon.png".into())).await
   }
 
-  async fn root(library: Extension<Arc<Library>>) -> ServerResult {
-    Self::file(
-      library
-        .handler(Target::Root)
-        .ok_or_else(|| ServerError::NotFound {
-          message: "library handler not found".into(),
-        })?,
-      "",
-      "index.html",
-    )
+  async fn root(library: Extension<Arc<Library>>) -> templates::Root {
+    templates::Root {
+      peer: None,
+      node: None,
+      library: (*library).clone(),
+      package: None,
+    }
   }
 
   async fn packages(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Hash, Manifest>> {
@@ -231,6 +220,44 @@ impl Server {
         .map(|(hash, package)| (*hash, package.manifest.clone()))
         .collect(),
     )
+  }
+
+  async fn peer(
+    library: Extension<Arc<Library>>,
+    node: Extension<Arc<Node>>,
+    peer: Path<DeserializeFromStr<Id>>,
+  ) -> ServerResult<templates::Root> {
+    let peer = **peer;
+
+    let hashes = node
+      .search(peer)
+      .await
+      .map_err(|source| ServerError::Node { source })?
+      .with_context(|| server_error::NotFound {
+        message: format!("peer {peer} not found"),
+      })?;
+
+    let mut manifests = BTreeMap::new();
+
+    for hash in hashes {
+      let manifest = node
+        .get(peer, hash)
+        .await
+        .map_err(|source| ServerError::Node { source })?;
+
+      let Some(manifest) = manifest else {
+        todo!();
+      };
+
+      manifests.insert(hash, manifest);
+    }
+
+    Ok(templates::Root {
+      node: None,
+      library: (*library).clone(),
+      package: None,
+      peer: Some((peer, manifests)),
+    })
   }
 
   async fn search(
@@ -266,8 +293,40 @@ impl Server {
     Ok(Cbor(Some(manifests)))
   }
 
+  async fn static_asset(Path(path): Path<String>) -> ServerResult<Response> {
+    let content = StaticAssets::get(if let Some(stripped) = path.strip_prefix('/') {
+      stripped
+    } else {
+      &path
+    })
+    .with_context(|| server_error::NotFound {
+      message: format!("{path} not found"),
+    })?;
+
+    let body = Body::from(content.data);
+    let mime = mime_guess::from_path(path).first_or_octet_stream();
+    Ok(
+      Response::builder()
+        .header(header::CONTENT_TYPE, mime.as_ref())
+        .body(body)
+        .unwrap(),
+    )
+  }
+
   async fn handlers(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Target, Hash>> {
     Cbor(library.handlers().clone())
+  }
+
+  async fn node_new(
+    library: Extension<Arc<Library>>,
+    node: Extension<Arc<Node>>,
+  ) -> ServerResult<templates::Root> {
+    Ok(templates::Root {
+      peer: None,
+      node: Some(node.info().await),
+      library: (*library).clone(),
+      package: None,
+    })
   }
 
   async fn node(node: Extension<Arc<Node>>) -> Cbor<media::api::Node> {
@@ -284,6 +343,42 @@ impl Server {
       "/app/",
       &path,
     )
+  }
+
+  async fn foo(
+    library: Extension<Arc<Library>>,
+    Path(DeserializeFromStr(package)): Path<DeserializeFromStr<Hash>>,
+  ) -> ServerResult<templates::Root> {
+    library
+      .package(package)
+      .ok_or_else(|| ServerError::NotFound {
+        message: format!("package {package} not found"),
+      })?;
+
+    Ok(templates::Root {
+      node: None,
+      peer: None,
+      library: (*library).clone(),
+      package: Some(package),
+    })
+  }
+
+  async fn bar(
+    library: Extension<Arc<Library>>,
+    Path((DeserializeFromStr(package), file)): Path<(DeserializeFromStr<Hash>, String)>,
+  ) -> ServerResult {
+    let package = library
+      .package(package)
+      .ok_or_else(|| ServerError::NotFound {
+        message: format!("package {package} not found"),
+      })?;
+
+    match package.file(&file) {
+      Some((content_type, content)) => Ok(Resource::new(content_type, content)),
+      None => Err(ServerError::NotFound {
+        message: format!("{file} not found"),
+      }),
+    }
   }
 
   async fn app_root(

@@ -1,0 +1,61 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Library</title>
+    <link rel="stylesheet" href="/static/modern-normalize.css">
+    <link rel="stylesheet" href="/static/index.css">
+  </head>
+  <body>
+    <nav>
+      <h1>System</h1>
+      <ul>
+        <li>
+          <a href=/node>Node</a>
+        </li>
+      </ul>
+      <h1>Content</h1>
+      <ul>
+%% for (hash, package) in &self.library.packages {
+        <li>
+          <a href=/{{hash}}>{{package.manifest.name}}</a>
+        </li>
+%% }
+      </ul>
+    </nav>
+    <main>
+%% if let Some((peer, packages)) = &self.peer {
+      <h1>{{ peer }}</h1>
+      <ul>
+%%   for (hash, manifest) in packages {
+        <li>{{ manifest.name }}</li>
+%%   }
+      </ul>
+%% } else if let Some(node) = &self.node {
+      <h1>Node</h1>
+      {{ node.peer }}
+      <h2>Statistics</h2>
+      <h3>Sent</h3>
+      {{ node.sent }}
+      <h3>Received</h3>
+      {{ node.received }}
+      <h2>Peers</h2>
+      <ul>
+%%   for peer in &node.local {
+        <li><a href=/peer/{{peer}}>{{peer}}</a></li>
+%%   }
+      </ul>
+%% } else if let Some(hash) = self.package {
+%%   let package = self.library.package(hash).unwrap();
+%%   match &package.manifest.media {
+%%     Media::Comic { pages } => {
+%%       for i in 0..pages.len() {
+      <img src=/{{hash}}/{{i}}>
+%%       }
+%%     }
+%%     Media::App { .. } => {
+%%     }
+%%   }
+%% }
+    </main>
+  </body>
+</html>
