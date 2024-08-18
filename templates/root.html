@@ -15,7 +15,7 @@
       </ul>
       <h1>Content</h1>
       <ul>
-%% for (hash, package) in &self.library.packages {
+%% for (hash, package) in self.packages.iter() {
         <li>
           <a href=/{{hash}}>{{package.manifest.name}}</a>
         </li>
@@ -45,7 +45,7 @@
 %%   }
       </ul>
 %% } else if let Some(hash) = self.package {
-%%   let package = self.library.package(hash).unwrap();
+%%   let package = self.packages.get(&hash).unwrap();
 %%   match &package.manifest.media {
 %%     Media::Comic { pages } => {
 %%       for i in 0..pages.len() {

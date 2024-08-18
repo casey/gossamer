@@ -2,19 +2,11 @@
 
 use {
   self::{
-    deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, library::Library,
-    message::Message, metadata::Metadata, node::Node, package::Package, path_ext::PathExt,
-    read_ext::ReadExt, report::Report, subcommand::Subcommand, template::Template,
-    write_ext::WriteExt,
+    deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, message::Message,
+    metadata::Metadata, node::Node, package::Package, path_ext::PathExt, read_ext::ReadExt,
+    report::Report, subcommand::Subcommand, template::Template, write_ext::WriteExt,
   },
-  axum::{
-    body::Body,
-    http::{
-      self,
-      header::{self, HeaderValue},
-      Uri,
-    },
-  },
+  axum::{body::Body, http::header},
   boilerplate::Boilerplate,
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
@@ -62,7 +54,6 @@ use test::*;
 mod deserialize_from_str;
 mod error;
 mod into_u64;
-mod library;
 mod message;
 mod metadata;
 mod node;

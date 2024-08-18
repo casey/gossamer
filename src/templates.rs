@@ -5,6 +5,6 @@ use super::*;
 pub(crate) struct Root {
   pub(crate) node: Option<media::api::Node>,
   pub(crate) package: Option<Hash>,
-  pub(crate) library: Arc<Library>,
+  pub(crate) packages: Arc<BTreeMap<Hash, Package>>,
   pub(crate) peer: Option<(Id, BTreeMap<Hash, Manifest>)>,
 }

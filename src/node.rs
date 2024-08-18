@@ -68,7 +68,7 @@ pub(crate) struct Node {
   received: AtomicU64,
   local: RwLock<HashMap<Id, Peer>>,
   sent: AtomicU64,
-  library: Arc<Library>,
+  pub(crate) packages: Arc<BTreeMap<Hash, Package>>,
 }
 
 fn random_id() -> Id {
@@ -77,7 +77,11 @@ fn random_id() -> Id {
 }
 
 impl Node {
-  pub(crate) async fn new(address: IpAddr, library: Arc<Library>, port: u16) -> Result<Self> {
+  pub(crate) async fn new(
+    address: IpAddr,
+    packages: BTreeMap<Hash, Package>,
+    port: u16,
+  ) -> Result<Self> {
     let id = random_id();
 
     let endpoint = passthrough::Session::endpoint(id, address, port);
@@ -88,7 +92,7 @@ impl Node {
       endpoint,
       id,
       ip: socket_address.ip(),
-      library,
+      packages: Arc::new(packages),
       port: socket_address.port(),
       received: AtomicU64::default(),
       sent: AtomicU64::default(),
@@ -246,7 +250,6 @@ impl Node {
             &mut tx,
             response::Get(
               self
-                .library
                 .packages
                 .get(&hash)
                 .map(|package| package.manifest.to_cbor()),
@@ -262,7 +265,7 @@ impl Node {
           .send(
             peer,
             &mut tx,
-            response::Search(self.library.packages.keys().cloned().collect()),
+            response::Search(self.packages.keys().cloned().collect()),
           )
           .await?;
         Self::finish(connection, peer, Status::Done, tx).await?;

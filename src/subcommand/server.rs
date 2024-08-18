@@ -1,5 +1,5 @@
 use {
-  self::{server_error::ServerError, target_validator::TargetValidator},
+  self::server_error::ServerError,
   super::*,
   axum::{
     extract::{Extension, Path},
@@ -10,33 +10,16 @@ use {
   },
   rust_embed::RustEmbed,
   tokio::runtime::Runtime,
-  tower_http::{
-    propagate_header::PropagateHeaderLayer,
-    set_header::SetRequestHeaderLayer,
-    validate_request::{ValidateRequest, ValidateRequestHeaderLayer},
-  },
 };
 
 // todo:
 // - okay_or_not_found
 
 mod server_error;
-mod target_validator;
 
 #[derive(RustEmbed)]
 #[folder = "static"]
 struct StaticAssets;
-
-struct Cbor<T>(T);
-
-impl<T: Serialize> IntoResponse for Cbor<T> {
-  fn into_response(self) -> Response {
-    let mut cbor = Vec::new();
-    ciborium::into_writer(&self.0, &mut cbor).unwrap();
-
-    ([(header::CONTENT_TYPE, "application/cbor")], cbor).into_response()
-  }
-}
 
 #[derive(Parser)]
 pub(crate) struct Server {
@@ -59,9 +42,6 @@ pub(crate) struct Server {
   #[arg(long, help = "Bootstrap DHT node with <PEER>.", value_name = "<PEER>")]
   bootstrap: Option<Peer>,
 }
-
-type HashPath = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>, String)>;
-type HashRoot = Path<(DeserializeFromStr<Hash>, DeserializeFromStr<Hash>)>;
 
 #[derive(Debug)]
 struct Resource {
@@ -92,11 +72,11 @@ type ServerResult<T = Resource> = std::result::Result<T, ServerError>;
 
 impl Server {
   pub(crate) fn run(self) -> Result {
-    let mut library = Library::default();
+    let mut packages = BTreeMap::new();
 
     for path in &self.packages {
       let package = Package::load(path).context(error::PackageLoad { path })?;
-      library.add(package);
+      packages.insert(package.hash, package);
     }
 
     if self.open {
@@ -104,11 +84,9 @@ impl Server {
       open::that(&url).context(error::Open { url: &url })?;
     }
 
-    let library = Arc::new(library);
-
     Runtime::new().context(error::Runtime)?.block_on(async {
       let node = Arc::new(
-        Node::new(self.address, library.clone(), 0)
+        Node::new(self.address, packages, 0)
           .await
           .context(error::NodeInitialize)?,
       );
@@ -136,27 +114,6 @@ impl Server {
             .route("/peer/:peer", get(Self::peer))
             .route("/:package", get(Self::foo))
             .route("/:package/:file", get(Self::bar))
-            // old:
-            .route("/api/handlers", get(Self::handlers))
-            .route("/api/node", get(Self::node))
-            .route("/api/packages", get(Self::packages))
-            .route("/api/search/:peer", get(Self::search))
-            .route("/app/*path", get(Self::root_app))
-            .route("/:app/:content/", get(Self::app_root))
-            .route("/:app/:content/api/manifest", get(Self::manifest))
-            .route("/:app/:content/app/*path", get(Self::app))
-            .route("/:app/:content/content/*path", get(Self::content))
-            // .layer(PropagateHeaderLayer::new(header::CONTENT_SECURITY_POLICY))
-            // .layer(SetRequestHeaderLayer::overriding(
-            //   header::CONTENT_SECURITY_POLICY,
-            //   move |request: &http::Request<Body>| {
-            //     Some(Self::content_security_policy(self.http_port, request.uri()))
-            //   },
-            // ))
-            // .layer(ValidateRequestHeaderLayer::custom(TargetValidator(
-            //   library.clone(),
-            // )))
-            .layer(Extension(library))
             .layer(Extension(node))
             .into_make_service(),
         )
@@ -169,61 +126,20 @@ impl Server {
     Ok(())
   }
 
-  fn content_security_policy(port: u16, uri: &Uri) -> HeaderValue {
-    static APP: Lazy<Regex> = lazy_regex!("^/([[:xdigit:]]{64})/([[:xdigit:]]{64})/(app/.*)?$");
-    static ROOT: Lazy<Regex> = lazy_regex!("^/(app/.*)?$");
-
-    let path = uri.path();
-
-    if ROOT.is_match(path) {
-      return HeaderValue::from_static("default-src 'unsafe-eval' 'unsafe-inline' 'self'");
-    }
-
-    APP
-      .captures(path)
-      .map(|captures| {
-        HeaderValue::try_from(format!(
-          "default-src 'unsafe-eval' 'unsafe-inline' http://localhost:{port}/{}/{}/",
-          &captures[1], &captures[2],
-        ))
-        .unwrap()
-      })
-      .unwrap_or_else(|| HeaderValue::from_static("default-src"))
-  }
-
-  fn package(library: &Library, hash: Hash) -> ServerResult<&Package> {
-    library
-      .package(hash)
-      .with_context(|| server_error::NotFound {
-        message: format!("package {hash} not found"),
-      })
-  }
-
   async fn favicon() -> ServerResult<Response> {
     Self::static_asset(Path("favicon.png".into())).await
   }
 
-  async fn root(library: Extension<Arc<Library>>) -> templates::Root {
+  async fn root(node: Extension<Arc<Node>>) -> templates::Root {
     templates::Root {
       peer: None,
       node: None,
-      library: (*library).clone(),
+      packages: node.packages.clone(),
       package: None,
     }
   }
 
-  async fn packages(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Hash, Manifest>> {
-    Cbor(
-      library
-        .packages()
-        .iter()
-        .map(|(hash, package)| (*hash, package.manifest.clone()))
-        .collect(),
-    )
-  }
-
   async fn peer(
-    library: Extension<Arc<Library>>,
     node: Extension<Arc<Node>>,
     peer: Path<DeserializeFromStr<Id>>,
   ) -> ServerResult<templates::Root> {
@@ -254,43 +170,10 @@ impl Server {
 
     Ok(templates::Root {
       node: None,
-      library: (*library).clone(),
+      packages: node.packages.clone(),
       package: None,
       peer: Some((peer, manifests)),
     })
-  }
-
-  async fn search(
-    node: Extension<Arc<Node>>,
-    peer: Path<DeserializeFromStr<Id>>,
-  ) -> ServerResult<Cbor<Option<BTreeMap<Hash, Manifest>>>> {
-    let peer = **peer;
-
-    let hashes = node
-      .search(peer)
-      .await
-      .map_err(|source| ServerError::Node { source })?;
-
-    let Some(hashes) = hashes else {
-      return Ok(Cbor(None));
-    };
-
-    let mut manifests = BTreeMap::new();
-
-    for hash in hashes {
-      let manifest = node
-        .get(peer, hash)
-        .await
-        .map_err(|source| ServerError::Node { source })?;
-
-      let Some(manifest) = manifest else {
-        todo!();
-      };
-
-      manifests.insert(hash, manifest);
-    }
-
-    Ok(Cbor(Some(manifests)))
   }
 
   async fn static_asset(Path(path): Path<String>) -> ServerResult<Response> {
@@ -313,44 +196,22 @@ impl Server {
     )
   }
 
-  async fn handlers(library: Extension<Arc<Library>>) -> Cbor<BTreeMap<Target, Hash>> {
-    Cbor(library.handlers().clone())
-  }
-
-  async fn node_new(
-    library: Extension<Arc<Library>>,
-    node: Extension<Arc<Node>>,
-  ) -> ServerResult<templates::Root> {
+  async fn node_new(node: Extension<Arc<Node>>) -> ServerResult<templates::Root> {
     Ok(templates::Root {
       peer: None,
       node: Some(node.info().await),
-      library: (*library).clone(),
+      packages: node.packages.clone(),
       package: None,
     })
   }
 
-  async fn node(node: Extension<Arc<Node>>) -> Cbor<media::api::Node> {
-    Cbor(node.info().await)
-  }
-
-  async fn root_app(library: Extension<Arc<Library>>, path: Path<String>) -> ServerResult {
-    Self::file(
-      library
-        .handler(Target::Root)
-        .ok_or_else(|| ServerError::NotFound {
-          message: "library handler not found".into(),
-        })?,
-      "/app/",
-      &path,
-    )
-  }
-
   async fn foo(
-    library: Extension<Arc<Library>>,
+    node: Extension<Arc<Node>>,
     Path(DeserializeFromStr(package)): Path<DeserializeFromStr<Hash>>,
   ) -> ServerResult<templates::Root> {
-    library
-      .package(package)
+    node
+      .packages
+      .get(&package)
       .ok_or_else(|| ServerError::NotFound {
         message: format!("package {package} not found"),
       })?;
@@ -358,17 +219,18 @@ impl Server {
     Ok(templates::Root {
       node: None,
       peer: None,
-      library: (*library).clone(),
+      packages: node.packages.clone(),
       package: Some(package),
     })
   }
 
   async fn bar(
-    library: Extension<Arc<Library>>,
+    node: Extension<Arc<Node>>,
     Path((DeserializeFromStr(package), file)): Path<(DeserializeFromStr<Hash>, String)>,
   ) -> ServerResult {
-    let package = library
-      .package(package)
+    let package = node
+      .packages
+      .get(&package)
       .ok_or_else(|| ServerError::NotFound {
         message: format!("package {package} not found"),
       })?;
@@ -377,43 +239,6 @@ impl Server {
       Some((content_type, content)) => Ok(Resource::new(content_type, content)),
       None => Err(ServerError::NotFound {
         message: format!("{file} not found"),
-      }),
-    }
-  }
-
-  async fn app_root(
-    library: Extension<Arc<Library>>,
-    Path((app, _content)): HashRoot,
-  ) -> ServerResult {
-    Self::file(Self::package(&library, app.0)?, "", "index.html")
-  }
-
-  async fn manifest(
-    library: Extension<Arc<Library>>,
-    Path((_app, content)): HashRoot,
-  ) -> ServerResult<Cbor<Manifest>> {
-    Ok(Cbor(Self::package(&library, content.0)?.manifest.clone()))
-  }
-
-  async fn app(
-    library: Extension<Arc<Library>>,
-    Path((app, _content, path)): HashPath,
-  ) -> ServerResult {
-    Self::file(Self::package(&library, app.0)?, "/app/", &path)
-  }
-
-  async fn content(
-    library: Extension<Arc<Library>>,
-    Path((_app, content, path)): HashPath,
-  ) -> ServerResult {
-    Self::file(Self::package(&library, content.0)?, "/content/", &path)
-  }
-
-  fn file(package: &Package, prefix: &str, path: &str) -> ServerResult {
-    match package.file(path) {
-      Some((content_type, content)) => Ok(Resource::new(content_type, content)),
-      None => Err(ServerError::NotFound {
-        message: format!("{prefix}{path} not found"),
       }),
     }
   }
