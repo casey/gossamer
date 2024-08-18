@@ -19,7 +19,6 @@ use {
     read_ext::ReadExt,
     report::Report,
     subcommand::Subcommand,
-    target::Target,
     template::Template,
     ty::Type,
     write_ext::WriteExt,
@@ -89,7 +88,6 @@ mod read_ext;
 mod report;
 mod response;
 mod subcommand;
-mod target;
 mod template;
 mod templates;
 mod ty;

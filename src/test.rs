@@ -52,25 +52,7 @@ macro_rules! assert_matches {
 pub(crate) static PACKAGES: Lazy<Packages> = Lazy::new(|| {
   let dir = tempdir();
 
-  let app = dir.join("app.package");
-
-  let root = dir.join("root.package");
-
   let comic = dir.join("comic.package");
-
-  subcommand::package::Package {
-    root: "tests/packages/app-comic".into(),
-    output: app.clone(),
-  }
-  .run()
-  .unwrap();
-
-  subcommand::package::Package {
-    root: "tests/packages/app-root".into(),
-    output: root.clone(),
-  }
-  .run()
-  .unwrap();
 
   subcommand::package::Package {
     root: "tests/packages/comic".into(),
@@ -81,29 +63,17 @@ pub(crate) static PACKAGES: Lazy<Packages> = Lazy::new(|| {
 
   Packages {
     dir,
-    app: Package::load(&app).unwrap(),
-    root: Package::load(&root).unwrap(),
     comic: Package::load(&comic).unwrap(),
   }
 });
 
 pub(crate) struct Packages {
-  root: Package,
-  app: Package,
   comic: Package,
   #[allow(unused)]
   dir: TempDir,
 }
 
 impl Packages {
-  pub(crate) fn app(&self) -> &Package {
-    &self.app
-  }
-
-  pub(crate) fn root(&self) -> &Package {
-    &self.root
-  }
-
   pub(crate) fn comic(&self) -> &Package {
     &self.comic
   }

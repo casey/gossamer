@@ -17,13 +17,6 @@ impl Metadata {
 
   pub(crate) fn template(self, root: &Utf8Path, paths: &HashSet<Utf8PathBuf>) -> Result<Template> {
     let media = match &self.media {
-      Media::App { target } => {
-        ensure!(
-          paths.contains(Utf8Path::new("index.html")),
-          error::Index { root }
-        );
-        template::Media::App { target: *target }
-      }
       Media::Comic => {
         let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();
 
@@ -71,14 +64,12 @@ impl Metadata {
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub(crate) enum Media {
-  App { target: Target },
   Comic,
 }
 
 impl Media {
   pub(crate) fn ty(&self) -> Type {
     match self {
-      Self::App { .. } => Type::App,
       Self::Comic => Type::Comic,
     }
   }

@@ -247,10 +247,6 @@ impl Package {
 
   pub(crate) fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
     match &self.manifest.media {
-      Media::App { paths, .. } => Some((
-        mime_guess::from_path(path).first_or_octet_stream(),
-        self.files.get(paths.get(path)?).unwrap().clone(),
-      )),
       Media::Comic { pages } => {
         if path.len() > 1 && path.starts_with('0') {
           return None;
@@ -277,7 +273,6 @@ impl Package {
     let mut missing = 0u64;
 
     let expected: HashSet<Hash> = match &manifest.media {
-      Media::App { paths, .. } => paths.values().copied().collect(),
       Media::Comic { pages } => pages.iter().copied().collect(),
     };
 
@@ -493,59 +488,6 @@ mod tests {
     assert_matches!(
       Package::load(&package).unwrap_err(),
       Error::DeserializeManifest { .. },
-    );
-  }
-
-  #[test]
-  fn save_and_load() {
-    let tempdir = tempdir();
-
-    let output = tempdir.join("package.package");
-
-    let root = tempdir.join("root");
-
-    tempdir.write("root/index.html", "html");
-    tempdir.write("root/index.js", "js");
-
-    let html = Hash::bytes(b"html");
-    let js = Hash::bytes(b"js");
-
-    let manifest = Manifest {
-      name: "app-comic".into(),
-      media: Media::App {
-        target: Target::Comic,
-        paths: vec![("index.html".into(), html), ("index.js".into(), js)]
-          .into_iter()
-          .collect(),
-      },
-    };
-
-    let manifest_bytes = manifest.to_cbor();
-
-    let hash = Hash::bytes(&manifest_bytes);
-
-    let hashes = vec![
-      ("index.html".into(), (html, 4)),
-      ("index.js".into(), (js, 2)),
-    ]
-    .into_iter()
-    .collect();
-
-    Package::save(hashes, &manifest, &output, &root).unwrap();
-
-    assert_eq!(
-      Package::load(&output).unwrap(),
-      Package {
-        files: vec![
-          (html, b"html".into()),
-          (js, b"js".into()),
-          (hash, manifest_bytes)
-        ]
-        .into_iter()
-        .collect(),
-        manifest,
-        hash,
-      },
     );
   }
 
