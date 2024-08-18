@@ -1,9 +1,0 @@
-[package]
-name = "app-viewer"
-version = "0.0.0"
-edition = "2021"
-publish = false
-
-[dependencies]
-hypermedia = { path = "../hypermedia" }
-xilem_web = { git = "https://github.com/linebender/xilem.git" }
