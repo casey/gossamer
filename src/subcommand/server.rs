@@ -108,12 +108,12 @@ impl Server {
         .serve(
           Router::new()
             .route("/", get(Self::root))
-            .route("/static/*path", get(Self::static_asset))
             .route("/favicon.ico", get(Self::favicon))
-            .route("/node", get(Self::node_new))
+            .route("/node", get(Self::node))
             .route("/peer/:peer", get(Self::peer))
-            .route("/:package", get(Self::foo))
-            .route("/:package/:file", get(Self::bar))
+            .route("/static/*path", get(Self::static_asset))
+            .route("/:package", get(Self::package))
+            .route("/:package/:file", get(Self::file))
             .layer(Extension(node))
             .into_make_service(),
         )
@@ -196,7 +196,7 @@ impl Server {
     )
   }
 
-  async fn node_new(node: Extension<Arc<Node>>) -> ServerResult<templates::Root> {
+  async fn node(node: Extension<Arc<Node>>) -> ServerResult<templates::Root> {
     Ok(templates::Root {
       peer: None,
       node: Some(node.info().await),
@@ -205,7 +205,7 @@ impl Server {
     })
   }
 
-  async fn foo(
+  async fn package(
     node: Extension<Arc<Node>>,
     Path(DeserializeFromStr(package)): Path<DeserializeFromStr<Hash>>,
   ) -> ServerResult<templates::Root> {
@@ -224,7 +224,7 @@ impl Server {
     })
   }
 
-  async fn bar(
+  async fn file(
     node: Extension<Arc<Node>>,
     Path((DeserializeFromStr(package), file)): Path<(DeserializeFromStr<Hash>, String)>,
   ) -> ServerResult {
