@@ -275,8 +275,8 @@ impl Node {
     Ok(())
   }
 
-  pub(crate) async fn info(&self) -> media::api::Node {
-    media::api::Node {
+  pub(crate) async fn info(&self) -> api::Node {
+    api::Node {
       local: self.local.read().await.keys().copied().collect(),
       peer: self.peer(),
       received: self.received.load(atomic::Ordering::Relaxed),

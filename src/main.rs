@@ -2,9 +2,27 @@
 
 use {
   self::{
-    deserialize_from_str::DeserializeFromStr, error::Error, into_u64::IntoU64, message::Message,
-    metadata::Metadata, node::Node, package::Package, path_ext::PathExt, read_ext::ReadExt,
-    report::Report, subcommand::Subcommand, template::Template, write_ext::WriteExt,
+    cbor::{FromCbor, ToCbor},
+    deserialize_from_str::DeserializeFromStr,
+    error::Error,
+    hash::Hash,
+    id::Id,
+    into_u64::IntoU64,
+    manifest::Manifest,
+    media::Media,
+    message::Message,
+    metadata::Metadata,
+    node::Node,
+    package::Package,
+    path_ext::PathExt,
+    peer::Peer,
+    read_ext::ReadExt,
+    report::Report,
+    subcommand::Subcommand,
+    target::Target,
+    template::Template,
+    ty::Type,
+    write_ext::WriteExt,
   },
   axum::{body::Body, http::header},
   boilerplate::Boilerplate,
@@ -12,19 +30,19 @@ use {
   clap::Parser,
   html_escaper::Escape,
   libc::EXIT_FAILURE,
-  media::{FromCbor, Hash, Id, Manifest, Media, Peer, Target, ToCbor, Type},
   mime_guess::{mime, Mime},
   quinn::{Connection, Endpoint, Incoming, RecvStream, SendStream},
   rand::Rng,
   regex::Regex,
   regex_static::{lazy_regex, once_cell::sync::Lazy},
-  serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize},
+  serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer},
   snafu::{ensure, ErrorCompat, OptionExt, ResultExt, Snafu},
   std::{
     any::Any,
     backtrace::{Backtrace, BacktraceStatus},
+    cmp::Ordering,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fmt::Display,
+    fmt::{self, Display, Formatter},
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -51,21 +69,30 @@ mod test;
 #[cfg(test)]
 use test::*;
 
+mod api;
+mod cbor;
 mod deserialize_from_str;
 mod error;
+mod hash;
+mod id;
 mod into_u64;
+mod manifest;
+mod media;
 mod message;
 mod metadata;
 mod node;
 mod package;
 mod passthrough;
 mod path_ext;
+mod peer;
 mod read_ext;
 mod report;
 mod response;
 mod subcommand;
+mod target;
 mod template;
 mod templates;
+mod ty;
 mod write_ext;
 
 type Result<T = (), E = Error> = std::result::Result<T, E>;

@@ -222,7 +222,6 @@ dependencies = [
  "cc",
  "cfg-if",
  "constant_time_eq",
- "serde",
 ]
 
 [[package]]
@@ -603,6 +602,7 @@ version = "0.0.0"
 dependencies = [
  "axum",
  "axum-server",
+ "blake3",
  "boilerplate",
  "bytes",
  "camino",
@@ -613,7 +613,6 @@ dependencies = [
  "html-escaper",
  "libc",
  "log",
- "media",
  "mime_guess",
  "open",
  "quinn",
@@ -624,6 +623,7 @@ dependencies = [
  "regex_static",
  "rust-embed",
  "serde",
+ "serde_bytes",
  "serde_json",
  "serde_yaml",
  "snafu",
@@ -871,18 +871,6 @@ name = "matchit"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e7465ac9959cc2b1404e8e2367b43684a6d13790fe23056cc8c6c5a6b7bcb94"
-
-[[package]]
-name = "media"
-version = "0.0.0"
-dependencies = [
- "blake3",
- "ciborium",
- "regex_static",
- "serde",
- "serde_bytes",
- "strum",
-]
 
 [[package]]
 name = "memchr"
