@@ -1,3 +1,6 @@
+//! This module provides a QUIC endpoint that does not perform encryption,
+//! authentication, or verification of any kind.
+
 use {
   super::*,
   bytes::BytesMut,
