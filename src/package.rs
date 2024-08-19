@@ -246,9 +246,15 @@ impl Package {
   }
 
   pub(crate) fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
+    static RE: Lazy<Regex> = lazy_regex!(r"^(\d+)\.jpg$");
+
     match &self.manifest.media {
       Media::Comic { pages } => {
-        if path.len() > 1 && path.starts_with('0') {
+        let captures = RE.captures(path)?;
+
+        let n = &captures[1];
+
+        if n.len() > 1 && n.starts_with('0') {
           return None;
         }
 
@@ -256,7 +262,7 @@ impl Package {
           mime::IMAGE_JPEG,
           self
             .files
-            .get(pages.get(path.parse::<usize>().ok()?)?)
+            .get(pages.get(n.parse::<usize>().ok()?)?)
             .unwrap()
             .clone(),
         ))
