@@ -9,3 +9,13 @@ impl<T: DeserializeOwned> FromCbor for T {
     ciborium::from_reader(Cursor::new(cbor))
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn from_cbor() {
+    assert_eq!(u32::from_cbor(&[0b000_01010]).unwrap(), 10);
+  }
+}
