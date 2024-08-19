@@ -232,9 +232,7 @@ mod tests {
 
     let manifest = Hash::bytes(&manifest_bytes);
 
-    let Media::Comic { pages } = package.manifest.media else {
-      panic!("unexpected manifest type");
-    };
+    let Media::Comic { pages } = package.manifest.media;
 
     let foo = Hash::bytes("foo".as_bytes());
     let bar = Hash::bytes("bar".as_bytes());
