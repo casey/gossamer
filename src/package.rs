@@ -499,4 +499,51 @@ mod tests {
   fn comic_page_numbers_may_not_have_leading_zeros() {
     assert!(PACKAGES.comic().file("00").is_none());
   }
+
+  #[test]
+  fn save_and_load() {
+    let tempdir = tempdir();
+
+    let output = tempdir.join("package.package");
+
+    let root = tempdir.join("root");
+
+    tempdir.write("root/0.jpg", "PAGE0");
+    tempdir.write("root/1.jpg", "PAGE1");
+
+    let page0 = Hash::bytes(b"PAGE0");
+    let page1 = Hash::bytes(b"PAGE1");
+
+    let manifest = Manifest {
+      name: "Foo".into(),
+      media: Media::Comic {
+        pages: vec![page0, page1],
+      },
+    };
+
+    let manifest_bytes = manifest.to_cbor();
+
+    let hash = Hash::bytes(&manifest_bytes);
+
+    let hashes = vec![("0.jpg".into(), (page0, 5)), ("1.jpg".into(), (page1, 5))]
+      .into_iter()
+      .collect();
+
+    Package::save(hashes, &manifest, &output, &root).unwrap();
+
+    assert_eq!(
+      Package::load(&output).unwrap(),
+      Package {
+        files: vec![
+          (page0, b"PAGE0".into()),
+          (page1, b"PAGE1".into()),
+          (hash, manifest_bytes)
+        ]
+        .into_iter()
+        .collect(),
+        manifest,
+        hash,
+      },
+    );
+  }
 }
