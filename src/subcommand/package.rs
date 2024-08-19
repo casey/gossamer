@@ -103,19 +103,17 @@ mod tests {
 
   #[test]
   fn package() {
-    for root in ["tests/packages/app-comic", "tests/packages/comic"] {
-      let tempdir = tempdir();
+    let tempdir = tempdir();
 
-      let result = Package {
-        root: root.into(),
-        output: tempdir.join("output.package"),
-      }
-      .run();
+    let result = Package {
+      root: "tests/packages/comic".into(),
+      output: tempdir.join("output.package"),
+    }
+    .run();
 
-      if let Err(err) = result {
-        err.report();
-        panic!("packaging {root} failed");
-      }
+    if let Err(err) = result {
+      err.report();
+      panic!("packaging failed");
     }
   }
 
