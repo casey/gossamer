@@ -81,6 +81,7 @@ mod write_ext;
 type Result<T = (), E = Error> = std::result::Result<T, E>;
 
 fn main() {
+  env_logger::init();
   if let Err(err) = Subcommand::parse().run() {
     err.report();
     process::exit(EXIT_FAILURE)

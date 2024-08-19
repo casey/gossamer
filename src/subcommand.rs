@@ -25,7 +25,6 @@ pub(crate) enum Subcommand {
 
 impl Subcommand {
   pub(crate) fn run(self) -> Result {
-    env_logger::init();
     match self {
       Self::Package(package) => package.run(),
       Self::Server(server) => server.run(),
