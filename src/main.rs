@@ -68,6 +68,7 @@ mod package;
 mod passthrough;
 mod path_ext;
 mod peer;
+mod re;
 mod read_ext;
 mod report;
 mod response;

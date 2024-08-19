@@ -246,11 +246,9 @@ impl Package {
   }
 
   pub(crate) fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
-    static RE: Lazy<Regex> = lazy_regex!(r"^(\d+)\.jpg$");
-
     match &self.manifest.media {
       Media::Comic { pages } => {
-        let captures = RE.captures(path)?;
+        let captures = re::COMIC_PAGE.captures(path)?;
 
         let n = &captures[1];
 

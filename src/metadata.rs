@@ -20,10 +20,8 @@ impl Metadata {
       Media::Comic => {
         let mut pages: Vec<(u64, Utf8PathBuf)> = Vec::new();
 
-        static PAGE: Lazy<Regex> = lazy_regex!(r"^(\d+)\.jpg$");
-
         for path in paths {
-          let captures = PAGE
+          let captures = re::COMIC_PAGE
             .captures(path.as_ref())
             .context(error::UnexpectedFile {
               file: path.clone(),
