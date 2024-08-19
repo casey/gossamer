@@ -27,7 +27,7 @@ open:
 serve port="80":
   cargo build
   target/debug/gossamer package --root tests/packages/comic --output build/test-comic.package
-  RUST_LOG=gossamer=trace target/debug/gossamer server \
+  target/debug/gossamer server \
     --http-port {{port}} \
     --packages \
       build/test-comic.package
