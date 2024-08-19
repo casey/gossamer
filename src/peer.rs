@@ -3,18 +3,18 @@ use super::*;
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(Error)))]
 pub(crate) enum Error {
-  #[snafu(display("invalid peer `{input}`"))]
-  Invalid { input: String },
-  #[snafu(display("invalid peer ID `{input}`"))]
-  Id {
-    input: String,
-    source: blake3::HexError,
-  },
   #[snafu(display("invalid peer address `{input}`"))]
   Address {
     input: String,
     source: AddrParseError,
   },
+  #[snafu(display("invalid peer ID `{input}`"))]
+  Id {
+    input: String,
+    source: blake3::HexError,
+  },
+  #[snafu(display("invalid peer `{input}`"))]
+  Invalid { input: String },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Ord, PartialOrd)]
