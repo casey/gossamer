@@ -2,26 +2,11 @@
 
 use {
   self::{
-    cbor::{FromCbor, ToCbor},
-    deserialize_from_str::DeserializeFromStr,
-    error::Error,
-    hash::Hash,
-    id::Id,
-    into_u64::IntoU64,
-    manifest::Manifest,
-    media::Media,
-    message::Message,
-    metadata::Metadata,
-    node::Node,
-    package::Package,
-    path_ext::PathExt,
-    peer::Peer,
-    read_ext::ReadExt,
-    report::Report,
-    subcommand::Subcommand,
-    template::Template,
-    ty::Type,
-    write_ext::WriteExt,
+    deserialize_from_str::DeserializeFromStr, error::Error, from_cbor::FromCbor, hash::Hash,
+    id::Id, into_u64::IntoU64, manifest::Manifest, media::Media, message::Message,
+    metadata::Metadata, node::Node, package::Package, path_ext::PathExt, peer::Peer,
+    read_ext::ReadExt, report::Report, subcommand::Subcommand, template::Template, to_cbor::ToCbor,
+    ty::Type, write_ext::WriteExt,
   },
   axum::{body::Body, http::header},
   boilerplate::Boilerplate,
@@ -68,9 +53,9 @@ mod test;
 #[cfg(test)]
 use test::*;
 
-mod cbor;
 mod deserialize_from_str;
 mod error;
+mod from_cbor;
 mod hash;
 mod id;
 mod into_u64;
@@ -88,6 +73,7 @@ mod report;
 mod response;
 mod subcommand;
 mod template;
+mod to_cbor;
 mod ty;
 mod write_ext;
 
