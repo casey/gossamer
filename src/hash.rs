@@ -4,18 +4,18 @@ use super::*;
 pub(crate) struct Hash(blake3::Hash);
 
 impl Hash {
-  pub const LEN: usize = blake3::OUT_LEN;
+  pub(crate) const LEN: usize = blake3::OUT_LEN;
 
-  pub fn as_bytes(&self) -> &[u8; Self::LEN] {
+  pub(crate) fn as_bytes(&self) -> &[u8; Self::LEN] {
     self.0.as_bytes()
   }
 
   #[allow(clippy::self_named_constructors)]
-  pub fn bytes(input: &[u8]) -> Self {
+  pub(crate) fn bytes(input: &[u8]) -> Self {
     Self(blake3::hash(input))
   }
 
-  pub fn reader(read: impl Read) -> io::Result<Self> {
+  pub(crate) fn reader(read: impl Read) -> io::Result<Self> {
     let mut hasher = blake3::Hasher::new();
 
     hasher.update_reader(read)?;

@@ -4,9 +4,9 @@ use super::*;
 pub(crate) struct Id([u8; Id::LEN]);
 
 impl Id {
-  pub const LEN: usize = 32;
+  pub(crate) const LEN: usize = 32;
 
-  pub fn as_bytes(&self) -> &[u8; Self::LEN] {
+  pub(crate) fn as_bytes(&self) -> &[u8; Self::LEN] {
     &self.0
   }
 }

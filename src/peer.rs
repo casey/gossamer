@@ -2,13 +2,13 @@ use super::*;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Ord, PartialOrd)]
 pub(crate) struct Peer {
-  pub id: Id,
-  pub ip: IpAddr,
-  pub port: u16,
+  pub(crate) id: Id,
+  pub(crate) ip: IpAddr,
+  pub(crate) port: u16,
 }
 
 impl Peer {
-  pub fn socket_addr(self) -> SocketAddr {
+  pub(crate) fn socket_addr(self) -> SocketAddr {
     (self.ip, self.port).into()
   }
 }
