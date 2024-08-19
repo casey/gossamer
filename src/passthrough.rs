@@ -34,17 +34,17 @@ impl AeadKey for Key {
     _data: &'a mut [u8],
     _additional_data: &[u8],
   ) -> Result<&'a mut [u8], CryptoError> {
-    todo!()
+    unimplemented!()
   }
 
   fn seal(&self, _data: &mut Vec<u8>, _additional_data: &[u8]) -> Result<(), CryptoError> {
-    todo!()
+    unimplemented!()
   }
 }
 
 impl HandshakeTokenKey for Key {
   fn aead_from_hkdf(&self, _random_bytes: &[u8]) -> Box<dyn AeadKey> {
-    todo!()
+    unimplemented!()
   }
 }
 
@@ -75,7 +75,7 @@ impl PacketKey for Key {
   fn encrypt(&self, _packet: u64, _buf: &mut [u8], _header_len: usize) {}
 
   fn integrity_limit(&self) -> u64 {
-    todo!();
+    unimplemented!();
   }
 
   fn tag_len(&self) -> usize {
@@ -126,7 +126,7 @@ impl crypto::ServerConfig for ServerConfig {
   }
 
   fn retry_tag(&self, _version: u32, _orig_dst_cid: &ConnectionId, _packet: &[u8]) -> [u8; 16] {
-    todo!()
+    unimplemented!()
   }
 
   fn start_session(
@@ -200,11 +200,11 @@ impl crypto::Session for Session {
     _label: &[u8],
     _context: &[u8],
   ) -> Result<(), ExportKeyingMaterialError> {
-    todo!()
+    unimplemented!()
   }
 
   fn handshake_data(&self) -> Option<Box<dyn Any>> {
-    todo!()
+    unimplemented!()
   }
 
   fn initial_keys(&self, _dst_cid: &ConnectionId, _side: Side) -> Keys {
@@ -216,7 +216,7 @@ impl crypto::Session for Session {
   }
 
   fn is_valid_retry(&self, _orig_dst_cid: &ConnectionId, _header: &[u8], _payload: &[u8]) -> bool {
-    todo!()
+    unimplemented!()
   }
 
   fn next_1rtt_keys(&mut self) -> Option<KeyPair<Box<dyn PacketKey>>> {
@@ -251,7 +251,7 @@ impl crypto::Session for Session {
       (State::Handshake, Side::Client) => {
         self.state = State::OneRtt;
       }
-      _ => todo!(),
+      _ => unimplemented!(),
     }
 
     Ok(true)
