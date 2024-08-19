@@ -497,7 +497,21 @@ mod tests {
 
   #[test]
   fn comic_page_numbers_may_not_have_leading_zeros() {
-    assert!(PACKAGES.comic().file("00").is_none());
+    let dir = tempdir();
+
+    let comic = dir.join("comic.package");
+
+    subcommand::package::Package {
+      root: "tests/packages/comic".into(),
+      output: comic.clone(),
+    }
+    .run()
+    .unwrap();
+
+    let comic = Package::load(&comic).unwrap();
+
+    assert!(comic.file("0.jpg").is_some());
+    assert!(comic.file("00.jpg").is_none());
   }
 
   #[test]

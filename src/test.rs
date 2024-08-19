@@ -48,33 +48,3 @@ macro_rules! assert_matches {
     }
   }
 }
-
-pub(crate) static PACKAGES: Lazy<Packages> = Lazy::new(|| {
-  let dir = tempdir();
-
-  let comic = dir.join("comic.package");
-
-  subcommand::package::Package {
-    root: "tests/packages/comic".into(),
-    output: comic.clone(),
-  }
-  .run()
-  .unwrap();
-
-  Packages {
-    dir,
-    comic: Package::load(&comic).unwrap(),
-  }
-});
-
-pub(crate) struct Packages {
-  comic: Package,
-  #[allow(unused)]
-  dir: TempDir,
-}
-
-impl Packages {
-  pub(crate) fn comic(&self) -> &Package {
-    &self.comic
-  }
-}
