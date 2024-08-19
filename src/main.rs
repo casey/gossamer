@@ -29,7 +29,7 @@ use {
     fmt::{self, Display, Formatter},
     fs::File,
     io::{self, BufReader, BufWriter, Cursor, Read, Seek, Write},
-    net::{IpAddr, Ipv4Addr, SocketAddr},
+    net::{AddrParseError, IpAddr, Ipv4Addr, SocketAddr},
     num::{ParseIntError, TryFromIntError},
     ops::{Deref, DerefMut},
     path::PathBuf,

@@ -1,5 +1,22 @@
 use super::*;
 
+#[derive(Debug, Snafu)]
+#[snafu(context(suffix(Error)))]
+pub(crate) enum Error {
+  #[snafu(display("invalid peer `{input}`"))]
+  Invalid { input: String },
+  #[snafu(display("invalid peer ID `{input}`"))]
+  Id {
+    input: String,
+    source: blake3::HexError,
+  },
+  #[snafu(display("invalid peer address `{input}`"))]
+  Address {
+    input: String,
+    source: AddrParseError,
+  },
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Ord, PartialOrd)]
 pub(crate) struct Peer {
   pub(crate) id: Id,
@@ -20,17 +37,19 @@ impl Display for Peer {
 }
 
 impl FromStr for Peer {
-  type Err = String;
+  type Err = Error;
 
-  fn from_str(s: &str) -> Result<Self, Self::Err> {
+  fn from_str(input: &str) -> Result<Self, Self::Err> {
     static RE: Lazy<Regex> = lazy_regex!("^(.*)@(.*)$");
 
-    let captures = RE.captures(s).unwrap();
+    let captures = RE.captures(input).context(InvalidError { input })?;
 
-    let socket_addr = captures[2].parse::<SocketAddr>().unwrap();
+    let socket_addr = captures[2]
+      .parse::<SocketAddr>()
+      .context(AddressError { input })?;
 
     Ok(Self {
-      id: captures[1].parse().unwrap(),
+      id: captures[1].parse().context(IdError { input })?,
       ip: socket_addr.ip(),
       port: socket_addr.port(),
     })
