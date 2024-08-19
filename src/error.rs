@@ -3,26 +3,11 @@ use super::*;
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(false)), visibility(pub))]
 pub(crate) enum Error {
-  #[snafu(display("app package must be of type `app` not `{ty}`"))]
-  AppType {
-    backtrace: Option<Backtrace>,
-    ty: Type,
-  },
-  #[snafu(display("failed to get current directory"))]
-  CurrentDir {
-    backtrace: Option<Backtrace>,
-    source: io::Error,
-  },
   #[snafu(display("failed to deserialize YAML package metadata at `{path}`"))]
   DeserializeMetadata {
     backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: serde_yaml::Error,
-  },
-  #[snafu(display("missing `index.html` in `{root}`"))]
-  Index {
-    backtrace: Option<Backtrace>,
-    root: Utf8PathBuf,
   },
   #[snafu(display("invalid page filename `{path}`"))]
   InvalidPage {
@@ -80,7 +65,7 @@ pub(crate) enum Error {
     #[snafu(backtrace)]
     source: package::Error,
   },
-  #[snafu(display("multifple page {page}s"))]
+  #[snafu(display("multiple page {page}s"))]
   PageDuplicated {
     backtrace: Option<Backtrace>,
     page: u64,
@@ -90,9 +75,7 @@ pub(crate) enum Error {
     backtrace: Option<Backtrace>,
     page: u64,
   },
-  #[snafu(
-    display("path contains invalid UTF-8: `{}`", path.display())
-  )]
+  #[snafu(display("path contains invalid UTF-8: `{}`", path.display()))]
   PathUnicode {
     backtrace: Option<Backtrace>,
     path: PathBuf,
