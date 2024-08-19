@@ -1,6 +1,6 @@
 use super::*;
 
-pub trait ToCbor: Sized {
+pub(crate) trait ToCbor: Sized {
   fn to_cbor(&self) -> Vec<u8>;
 }
 
@@ -12,7 +12,7 @@ impl<T: Serialize> ToCbor for T {
   }
 }
 
-pub trait FromCbor: Sized {
+pub(crate) trait FromCbor: Sized {
   fn from_cbor(cbor: &[u8]) -> Result<Self, ciborium::de::Error<io::Error>>;
 }
 

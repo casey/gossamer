@@ -27,7 +27,7 @@ use {
   boilerplate::Boilerplate,
   camino::{Utf8Path, Utf8PathBuf},
   clap::Parser,
-  html_escaper::Escape,
+  html_escaper::{Escape, Trusted},
   libc::EXIT_FAILURE,
   mime_guess::{mime, Mime},
   quinn::{Connection, Endpoint, Incoming, RecvStream, SendStream},
@@ -68,7 +68,6 @@ mod test;
 #[cfg(test)]
 use test::*;
 
-mod api;
 mod cbor;
 mod deserialize_from_str;
 mod error;
@@ -89,7 +88,6 @@ mod report;
 mod response;
 mod subcommand;
 mod template;
-mod templates;
 mod ty;
 mod write_ext;
 

@@ -1,5 +1,8 @@
 use {
-  self::server_error::ServerError,
+  self::{
+    server_error::ServerError,
+    templates::{NodeHtml, PackageHtml, PageHtml, SearchHtml},
+  },
   super::*,
   axum::{
     extract::{Extension, Path},
@@ -16,6 +19,7 @@ use {
 // - okay_or_not_found
 
 mod server_error;
+mod templates;
 
 #[derive(RustEmbed)]
 #[folder = "static"]
@@ -107,7 +111,7 @@ impl Server {
       axum_server::Server::bind((self.address, self.http_port).into())
         .serve(
           Router::new()
-            .route("/", get(Self::root))
+            .route("/", get(Self::node))
             .route("/favicon.ico", get(Self::favicon))
             .route("/node", get(Self::node))
             .route("/peer/:peer", get(Self::peer))
@@ -130,19 +134,10 @@ impl Server {
     Self::static_asset(Path("favicon.png".into())).await
   }
 
-  async fn root(node: Extension<Arc<Node>>) -> templates::Root {
-    templates::Root {
-      peer: None,
-      node: None,
-      packages: node.packages.clone(),
-      package: None,
-    }
-  }
-
   async fn peer(
     node: Extension<Arc<Node>>,
     peer: Path<DeserializeFromStr<Id>>,
-  ) -> ServerResult<templates::Root> {
+  ) -> ServerResult<PageHtml<SearchHtml>> {
     let peer = **peer;
 
     let hashes = node
@@ -168,11 +163,9 @@ impl Server {
       manifests.insert(hash, manifest);
     }
 
-    Ok(templates::Root {
-      node: None,
+    Ok(PageHtml {
       packages: node.packages.clone(),
-      package: None,
-      peer: Some((peer, manifests)),
+      main: SearchHtml { peer, manifests },
     })
   }
 
@@ -196,31 +189,34 @@ impl Server {
     )
   }
 
-  async fn node(node: Extension<Arc<Node>>) -> ServerResult<templates::Root> {
-    Ok(templates::Root {
-      peer: None,
-      node: Some(node.info().await),
+  async fn node(node: Extension<Arc<Node>>) -> PageHtml<NodeHtml> {
+    PageHtml {
       packages: node.packages.clone(),
-      package: None,
-    })
+      main: NodeHtml {
+        local: node.local.read().await.keys().copied().collect(),
+        peer: node.peer(),
+        received: node.received.load(atomic::Ordering::Relaxed),
+        sent: node.sent.load(atomic::Ordering::Relaxed),
+      },
+    }
   }
 
   async fn package(
     node: Extension<Arc<Node>>,
     Path(DeserializeFromStr(package)): Path<DeserializeFromStr<Hash>>,
-  ) -> ServerResult<templates::Root> {
-    node
+  ) -> ServerResult<PageHtml<PackageHtml>> {
+    let package = node
       .packages
       .get(&package)
       .ok_or_else(|| ServerError::NotFound {
         message: format!("package {package} not found"),
       })?;
 
-    Ok(templates::Root {
-      node: None,
-      peer: None,
+    Ok(PageHtml {
       packages: node.packages.clone(),
-      package: Some(package),
+      main: PackageHtml {
+        package: Arc::new(package.clone()),
+      },
     })
   }
 

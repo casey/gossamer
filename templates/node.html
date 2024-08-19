@@ -1,0 +1,13 @@
+<h1>Node</h1>
+{{ self.peer }}
+<h2>Statistics</h2>
+<h3>Sent</h3>
+{{ self.sent }}
+<h3>Received</h3>
+{{ self.received }}
+<h2>Peers</h2>
+<ul>
+%% for peer in &self.local {
+  <li><a href=/peer/{{peer}}>{{peer}}</a></li>
+%% }
+</ul>

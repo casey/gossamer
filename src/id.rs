@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
-pub struct Id([u8; Id::LEN]);
+pub(crate) struct Id([u8; Id::LEN]);
 
 impl Id {
   pub const LEN: usize = 32;

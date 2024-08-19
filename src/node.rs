@@ -64,10 +64,10 @@ pub(crate) struct Node {
   endpoint: Endpoint,
   id: Id,
   ip: IpAddr,
-  port: u16,
-  received: AtomicU64,
-  local: RwLock<HashMap<Id, Peer>>,
-  sent: AtomicU64,
+  pub(crate) port: u16,
+  pub(crate) received: AtomicU64,
+  pub(crate) local: RwLock<HashMap<Id, Peer>>,
+  pub(crate) sent: AtomicU64,
   pub(crate) packages: Arc<BTreeMap<Hash, Package>>,
 }
 
@@ -273,15 +273,6 @@ impl Node {
     }
 
     Ok(())
-  }
-
-  pub(crate) async fn info(&self) -> api::Node {
-    api::Node {
-      local: self.local.read().await.keys().copied().collect(),
-      peer: self.peer(),
-      received: self.received.load(atomic::Ordering::Relaxed),
-      sent: self.sent.load(atomic::Ordering::Relaxed),
-    }
   }
 
   async fn send<T: Serialize>(&self, peer: Peer, stream: &mut SendStream, message: T) -> Result {

@@ -1,7 +1,7 @@
 use super::*;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize, Ord, PartialOrd)]
-pub struct Peer {
+pub(crate) struct Peer {
   pub id: Id,
   pub ip: IpAddr,
   pub port: u16,
