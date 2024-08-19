@@ -447,4 +447,34 @@ mod tests {
       if path == "18446744073709551616.jpg",
     );
   }
+
+  #[test]
+  fn files_are_deduplicated() {
+    let tempdir = tempdir();
+
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
+
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "Foo".into(),
+        media: metadata::Media::Comic,
+      },
+    );
+
+    tempdir.write("root/0.jpg", "foo");
+    tempdir.write("root/1.jpg", "foo");
+
+    Package {
+      root: root.clone(),
+      output: output.clone(),
+    }
+    .run()
+    .unwrap_or_display();
+
+    let package = super::super::Package::load(&output).unwrap_or_display();
+
+    assert_eq!(package.files.len(), 2);
+  }
 }
