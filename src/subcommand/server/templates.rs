@@ -1,12 +1,6 @@
 use super::*;
 
 #[derive(Boilerplate)]
-pub(crate) struct PageHtml<T: Display> {
-  pub(crate) packages: Arc<BTreeMap<Hash, Package>>,
-  pub(crate) main: T,
-}
-
-#[derive(Boilerplate)]
 pub(crate) struct NodeHtml {
   pub(crate) local: BTreeSet<Id>,
   pub(crate) peer: Peer,
@@ -20,7 +14,13 @@ pub(crate) struct PackageHtml {
 }
 
 #[derive(Boilerplate)]
+pub(crate) struct PageHtml<T: Display> {
+  pub(crate) main: T,
+  pub(crate) packages: Arc<BTreeMap<Hash, Package>>,
+}
+
+#[derive(Boilerplate)]
 pub(crate) struct SearchHtml {
-  pub(crate) peer: Id,
   pub(crate) manifests: BTreeMap<Hash, Manifest>,
+  pub(crate) peer: Id,
 }
