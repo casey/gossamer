@@ -407,7 +407,7 @@ impl Node {
     Ok(file.map(|file| Manifest::from_cbor(&file).unwrap()))
   }
 
-  pub(crate) async fn search(&self, id: Id) -> Result<Option<BTreeSet<Hash>>> {
+  pub(crate) async fn search(&self, id: Id) -> Result<Option<Vec<Hash>>> {
     let Some((_id, &peer)) = self
       .local
       .read()
