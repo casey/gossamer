@@ -2,21 +2,21 @@ watch +args='test':
   cargo watch --clear --exec '{{args}}'
 
 outdated:
-  cargo outdated -R
+  cargo outdated
 
-# todo:
-# - add unused deps recipe
+unused:
+  cargo +nightly udeps --all-targets
 
 ci: clippy forbid
-  cargo fmt --all -- --check
-  cargo test --all
-  cargo test --all -- --ignored
+  cargo fmt -- --check
+  cargo test
+  cargo test -- --ignored
 
 clippy:
-  cargo clippy --all --all-targets -- --deny warnings
+  cargo clippy --all-targets -- --deny warnings
 
 fmt:
-  cargo fmt --all
+  cargo fmt
 
 forbid:
   ./bin/forbid
