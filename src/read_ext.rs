@@ -1,6 +1,6 @@
 use super::*;
 
-pub trait ReadExt {
+pub(crate) trait ReadExt {
   fn read_hash(&mut self) -> io::Result<Hash>;
 
   fn read_u64(&mut self) -> io::Result<u64>;

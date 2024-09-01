@@ -1,0 +1,7 @@
+<h1>{{ self.peer }}</h1>
+
+<ul>
+%% for (_hash, manifest) in &self.manifests {
+  <li>{{ manifest.name }}</li>
+%% }
+</ul>

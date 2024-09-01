@@ -1,15 +1,15 @@
 use super::*;
 
 #[derive(Parser)]
-pub struct Package {
+pub(crate) struct Package {
   #[arg(long, help = "Package contents of directory <ROOT>.")]
-  pub root: Utf8PathBuf,
+  pub(crate) root: Utf8PathBuf,
   #[arg(long, help = "Save package to <OUTPUT>.")]
-  pub output: Utf8PathBuf,
+  pub(crate) output: Utf8PathBuf,
 }
 
 impl Package {
-  pub fn run(self) -> Result {
+  pub(crate) fn run(self) -> Result {
     ensure!(
       !self.output.starts_with(&self.root),
       error::OutputInRoot {
@@ -103,19 +103,17 @@ mod tests {
 
   #[test]
   fn package() {
-    for root in ["tests/packages/app-comic", "tests/packages/comic"] {
-      let tempdir = tempdir();
+    let tempdir = tempdir();
 
-      let result = Package {
-        root: root.into(),
-        output: tempdir.join("output.package"),
-      }
-      .run();
+    let result = Package {
+      root: "tests/packages/comic".into(),
+      output: tempdir.join("output.package"),
+    }
+    .run();
 
-      if let Err(err) = result {
-        err.report();
-        panic!("packaging {root} failed");
-      }
+    if let Err(err) = result {
+      err.report();
+      panic!("packaging failed");
     }
   }
 
@@ -184,37 +182,6 @@ mod tests {
     );
   }
 
-  #[test]
-  fn app_requires_index_html() {
-    let tempdir = tempdir();
-
-    tempdir.write_yaml(
-      "root/metadata.yaml",
-      Metadata {
-        name: "app-comic".into(),
-        media: metadata::Media::App {
-          target: Target::Comic,
-        },
-      },
-    );
-
-    let root_dir = tempdir.join("root");
-
-    assert_matches!(
-      Package {
-        root: root_dir.clone(),
-        output: tempdir.join("output.package"),
-      }
-      .run()
-      .unwrap_err(),
-      Error::Index {
-        root,
-        ..
-      }
-      if root == root_dir,
-    );
-  }
-
   trait ResultExt<T> {
     fn unwrap_or_display(self) -> T;
   }
@@ -228,91 +195,6 @@ mod tests {
         Ok(ok) => ok,
       }
     }
-  }
-
-  #[test]
-  fn app_package_includes_all_files() {
-    let tempdir = tempdir();
-
-    let root = tempdir.join("root");
-    let output = tempdir.join("output.package");
-
-    tempdir.write_yaml(
-      "root/metadata.yaml",
-      Metadata {
-        name: "app-comic".into(),
-        media: metadata::Media::App {
-          target: Target::Comic,
-        },
-      },
-    );
-
-    tempdir.write("root/index.html", "foo");
-    tempdir.write("root/index.js", "bar");
-
-    Package {
-      root: root.clone(),
-      output: output.clone(),
-    }
-    .run()
-    .unwrap_or_display();
-
-    let package = super::super::Package::load(&output).unwrap_or_display();
-
-    assert_eq!(package.files.len(), 3);
-
-    let manifest_bytes = package.manifest.to_cbor();
-
-    let manifest = Hash::bytes(&manifest_bytes);
-
-    let Media::App { target, paths } = package.manifest.media else {
-      panic!("unexpected manifest type");
-    };
-
-    assert_eq!(target, Target::Comic);
-
-    let foo = Hash::bytes("foo".as_bytes());
-    let bar = Hash::bytes("bar".as_bytes());
-
-    assert_eq!(paths.len(), 2);
-    assert_eq!(paths["index.html"], foo);
-    assert_eq!(paths["index.js"], bar);
-
-    assert_eq!(package.files[&foo], "foo".as_bytes());
-    assert_eq!(package.files[&bar], "bar".as_bytes());
-    assert_eq!(package.files[&manifest], manifest_bytes);
-  }
-
-  #[test]
-  fn files_are_deduplicated() {
-    let tempdir = tempdir();
-
-    let root = tempdir.join("root");
-    let output = tempdir.join("output.package");
-
-    tempdir.write_yaml(
-      "root/metadata.yaml",
-      Metadata {
-        name: "app-comic".into(),
-        media: metadata::Media::App {
-          target: Target::Comic,
-        },
-      },
-    );
-
-    tempdir.write("root/index.html", "foo");
-    tempdir.write("root/index.js", "foo");
-
-    Package {
-      root: root.clone(),
-      output: output.clone(),
-    }
-    .run()
-    .unwrap_or_display();
-
-    let package = super::super::Package::load(&output).unwrap_or_display();
-
-    assert_eq!(package.files.len(), 2);
   }
 
   #[test]
@@ -348,9 +230,7 @@ mod tests {
 
     let manifest = Hash::bytes(&manifest_bytes);
 
-    let Media::Comic { pages } = package.manifest.media else {
-      panic!("unexpected manifest type");
-    };
+    let Media::Comic { pages } = package.manifest.media;
 
     let foo = Hash::bytes("foo".as_bytes());
     let bar = Hash::bytes("bar".as_bytes());
@@ -566,5 +446,35 @@ mod tests {
       }
       if path == "18446744073709551616.jpg",
     );
+  }
+
+  #[test]
+  fn files_are_deduplicated() {
+    let tempdir = tempdir();
+
+    let root = tempdir.join("root");
+    let output = tempdir.join("output.package");
+
+    tempdir.write_yaml(
+      "root/metadata.yaml",
+      Metadata {
+        name: "Foo".into(),
+        media: metadata::Media::Comic,
+      },
+    );
+
+    tempdir.write("root/0.jpg", "foo");
+    tempdir.write("root/1.jpg", "foo");
+
+    Package {
+      root: root.clone(),
+      output: output.clone(),
+    }
+    .run()
+    .unwrap_or_display();
+
+    let package = super::super::Package::load(&output).unwrap_or_display();
+
+    assert_eq!(package.files.len(), 2);
   }
 }

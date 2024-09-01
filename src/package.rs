@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(false)), visibility(pub))]
-pub enum Error {
+pub(crate) enum Error {
   #[snafu(display("failed to deserialize manifest"))]
   DeserializeManifest {
     backtrace: Option<Backtrace>,
@@ -85,16 +85,16 @@ pub enum Error {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Package {
-  pub files: HashMap<Hash, Vec<u8>>,
-  pub hash: Hash,
-  pub manifest: Manifest,
+pub(crate) struct Package {
+  pub(crate) files: HashMap<Hash, Vec<u8>>,
+  pub(crate) hash: Hash,
+  pub(crate) manifest: Manifest,
 }
 
 impl Package {
-  pub const MAGIC_BYTES: &'static str = "MEDIA📦\r\n\x1a\n\0";
+  pub(crate) const MAGIC_BYTES: &'static str = "MEDIA📦\r\n\x1a\n\0";
 
-  pub fn load(path: &Utf8Path) -> Result<Self, Error> {
+  pub(crate) fn load(path: &Utf8Path) -> Result<Self, Error> {
     let file = File::open(path)?;
 
     let len = file.metadata()?.len();
@@ -188,7 +188,7 @@ impl Package {
     })
   }
 
-  pub fn save(
+  pub(crate) fn save(
     hashes: HashMap<Utf8PathBuf, (Hash, u64)>,
     manifest: &Manifest,
     output: &Utf8Path,
@@ -245,14 +245,14 @@ impl Package {
     Ok(())
   }
 
-  pub fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
+  pub(crate) fn file(&self, path: &str) -> Option<(Mime, Vec<u8>)> {
     match &self.manifest.media {
-      Media::App { paths, .. } => Some((
-        mime_guess::from_path(path).first_or_octet_stream(),
-        self.files.get(paths.get(path)?).unwrap().clone(),
-      )),
       Media::Comic { pages } => {
-        if path.len() > 1 && path.starts_with('0') {
+        let captures = re::COMIC_PAGE.captures(path)?;
+
+        let n = &captures[1];
+
+        if n.len() > 1 && n.starts_with('0') {
           return None;
         }
 
@@ -260,7 +260,7 @@ impl Package {
           mime::IMAGE_JPEG,
           self
             .files
-            .get(pages.get(path.parse::<usize>().ok()?)?)
+            .get(pages.get(n.parse::<usize>().ok()?)?)
             .unwrap()
             .clone(),
         ))
@@ -268,7 +268,7 @@ impl Package {
     }
   }
 
-  pub fn verify(
+  pub(crate) fn verify(
     files: &HashMap<Hash, Vec<u8>>,
     manifest: &Manifest,
     manifest_hash: Hash,
@@ -277,7 +277,6 @@ impl Package {
     let mut missing = 0u64;
 
     let expected: HashSet<Hash> = match &manifest.media {
-      Media::App { paths, .. } => paths.values().copied().collect(),
       Media::Comic { pages } => pages.iter().copied().collect(),
     };
 
@@ -497,6 +496,25 @@ mod tests {
   }
 
   #[test]
+  fn comic_page_numbers_may_not_have_leading_zeros() {
+    let dir = tempdir();
+
+    let comic = dir.join("comic.package");
+
+    subcommand::package::Package {
+      root: "tests/packages/comic".into(),
+      output: comic.clone(),
+    }
+    .run()
+    .unwrap();
+
+    let comic = Package::load(&comic).unwrap();
+
+    assert!(comic.file("0.jpg").is_some());
+    assert!(comic.file("00.jpg").is_none());
+  }
+
+  #[test]
   fn save_and_load() {
     let tempdir = tempdir();
 
@@ -504,19 +522,16 @@ mod tests {
 
     let root = tempdir.join("root");
 
-    tempdir.write("root/index.html", "html");
-    tempdir.write("root/index.js", "js");
+    tempdir.write("root/0.jpg", "PAGE0");
+    tempdir.write("root/1.jpg", "PAGE1");
 
-    let html = Hash::bytes(b"html");
-    let js = Hash::bytes(b"js");
+    let page0 = Hash::bytes(b"PAGE0");
+    let page1 = Hash::bytes(b"PAGE1");
 
     let manifest = Manifest {
-      name: "app-comic".into(),
-      media: Media::App {
-        target: Target::Comic,
-        paths: vec![("index.html".into(), html), ("index.js".into(), js)]
-          .into_iter()
-          .collect(),
+      name: "Foo".into(),
+      media: Media::Comic {
+        pages: vec![page0, page1],
       },
     };
 
@@ -524,12 +539,9 @@ mod tests {
 
     let hash = Hash::bytes(&manifest_bytes);
 
-    let hashes = vec![
-      ("index.html".into(), (html, 4)),
-      ("index.js".into(), (js, 2)),
-    ]
-    .into_iter()
-    .collect();
+    let hashes = vec![("0.jpg".into(), (page0, 5)), ("1.jpg".into(), (page1, 5))]
+      .into_iter()
+      .collect();
 
     Package::save(hashes, &manifest, &output, &root).unwrap();
 
@@ -537,8 +549,8 @@ mod tests {
       Package::load(&output).unwrap(),
       Package {
         files: vec![
-          (html, b"html".into()),
-          (js, b"js".into()),
+          (page0, b"PAGE0".into()),
+          (page1, b"PAGE1".into()),
           (hash, manifest_bytes)
         ]
         .into_iter()
@@ -547,10 +559,5 @@ mod tests {
         hash,
       },
     );
-  }
-
-  #[test]
-  fn comic_page_numbers_may_not_have_leading_zeros() {
-    assert!(PACKAGES.comic().file("00").is_none());
   }
 }

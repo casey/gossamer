@@ -1,6 +1,6 @@
 use {super::*, std::path::Path};
 
-pub trait PathExt {
+pub(crate) trait PathExt {
   fn try_into_utf8(&self) -> Result<&Utf8Path>;
 }
 
@@ -10,7 +10,7 @@ impl PathExt for Path {
   }
 }
 
-pub trait PathBufExt {
+pub(crate) trait PathBufExt {
   #[allow(unused)]
   fn try_into_utf8(self) -> Result<Utf8PathBuf>;
 }

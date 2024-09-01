@@ -2,27 +2,12 @@ use super::*;
 
 #[derive(Debug, Snafu)]
 #[snafu(context(suffix(false)), visibility(pub))]
-pub enum Error {
-  #[snafu(display("app package must be of type `app` not `{ty}`"))]
-  AppType {
-    backtrace: Option<Backtrace>,
-    ty: Type,
-  },
-  #[snafu(display("failed to get current directory"))]
-  CurrentDir {
-    backtrace: Option<Backtrace>,
-    source: io::Error,
-  },
+pub(crate) enum Error {
   #[snafu(display("failed to deserialize YAML package metadata at `{path}`"))]
   DeserializeMetadata {
     backtrace: Option<Backtrace>,
     path: Utf8PathBuf,
     source: serde_yaml::Error,
-  },
-  #[snafu(display("missing `index.html` in `{root}`"))]
-  Index {
-    backtrace: Option<Backtrace>,
-    root: Utf8PathBuf,
   },
   #[snafu(display("invalid page filename `{path}`"))]
   InvalidPage {
@@ -40,6 +25,11 @@ pub enum Error {
   MetadataMissing {
     backtrace: Option<Backtrace>,
     root: Utf8PathBuf,
+  },
+  #[snafu(display("failed to initialize node"))]
+  NodeInitialize {
+    backtrace: Option<Backtrace>,
+    source: node::Error,
   },
   #[snafu(display("comic package in `{root}` contains no pages"))]
   NoPages {
@@ -75,7 +65,7 @@ pub enum Error {
     #[snafu(backtrace)]
     source: package::Error,
   },
-  #[snafu(display("multifple page {page}s"))]
+  #[snafu(display("multiple page {page}s"))]
   PageDuplicated {
     backtrace: Option<Backtrace>,
     page: u64,
@@ -85,9 +75,7 @@ pub enum Error {
     backtrace: Option<Backtrace>,
     page: u64,
   },
-  #[snafu(
-    display("path contains invalid UTF-8: `{}`", path.display())
-  )]
+  #[snafu(display("path contains invalid UTF-8: `{}`", path.display()))]
   PathUnicode {
     backtrace: Option<Backtrace>,
     path: PathBuf,
@@ -115,27 +103,4 @@ pub enum Error {
     root: Utf8PathBuf,
     source: walkdir::Error,
   },
-}
-
-impl Error {
-  pub fn report(&self) {
-    eprintln!("error: {self}");
-
-    for (i, err) in self.iter_chain().skip(1).enumerate() {
-      if i == 0 {
-        eprintln!();
-        eprintln!("because:");
-      }
-
-      eprintln!("- {err}");
-    }
-
-    if let Some(backtrace) = self.backtrace() {
-      if backtrace.status() == BacktraceStatus::Captured {
-        eprintln!();
-        eprintln!("backtrace:");
-        eprintln!("{backtrace}");
-      }
-    }
-  }
 }

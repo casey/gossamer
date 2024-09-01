@@ -1,0 +1,35 @@
+html {
+  height: 100%;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  height: 100%;
+}
+
+iframe {
+  border: 0;
+  display: block;
+}
+
+main {
+  border-left: 1px solid black;
+  height: 100%;
+  width: 100%;
+}
+
+main > img {
+  height: 100%;
+  width: 100%;
+}
+
+nav {
+  margin-left: 1rem;
+}
+
+section {
+  overflow: auto;
+  display: none;
+  margin-left: 1rem;
+}

@@ -1,12 +1,12 @@
 use super::*;
 
-pub use {std::fs, tempfile::TempDir};
+pub(crate) use {std::fs, tempfile::TempDir};
 
-pub fn tempdir() -> TempDir {
+pub(crate) fn tempdir() -> TempDir {
   tempfile::tempdir().unwrap()
 }
 
-pub trait TempDirExt {
+pub(crate) trait TempDirExt {
   fn path_utf8(&self) -> &Utf8Path;
 
   fn touch(&self, path: impl AsRef<Utf8Path>) {
@@ -46,65 +46,5 @@ macro_rules! assert_matches {
         stringify!($($pattern)|+ $(if $guard)?)
       ),
     }
-  }
-}
-
-pub static PACKAGES: Lazy<Packages> = Lazy::new(|| {
-  let dir = tempdir();
-
-  let app = dir.join("app.package");
-
-  let root = dir.join("root.package");
-
-  let comic = dir.join("comic.package");
-
-  subcommand::package::Package {
-    root: "tests/packages/app-comic".into(),
-    output: app.clone(),
-  }
-  .run()
-  .unwrap();
-
-  subcommand::package::Package {
-    root: "tests/packages/app-root".into(),
-    output: root.clone(),
-  }
-  .run()
-  .unwrap();
-
-  subcommand::package::Package {
-    root: "tests/packages/comic".into(),
-    output: comic.clone(),
-  }
-  .run()
-  .unwrap();
-
-  Packages {
-    dir,
-    app: Package::load(&app).unwrap(),
-    root: Package::load(&root).unwrap(),
-    comic: Package::load(&comic).unwrap(),
-  }
-});
-
-pub struct Packages {
-  root: Package,
-  app: Package,
-  comic: Package,
-  #[allow(unused)]
-  dir: TempDir,
-}
-
-impl Packages {
-  pub fn app(&self) -> &Package {
-    &self.app
-  }
-
-  pub fn root(&self) -> &Package {
-    &self.root
-  }
-
-  pub fn comic(&self) -> &Package {
-    &self.comic
   }
 }
