@@ -15,9 +15,6 @@ use {
   tokio::runtime::Runtime,
 };
 
-// todo:
-// - okay_or_not_found
-
 mod server_error;
 mod templates;
 
@@ -157,7 +154,7 @@ impl Server {
         .map_err(|source| ServerError::Node { source })?;
 
       let Some(manifest) = manifest else {
-        todo!();
+        unimplemented!();
       };
 
       manifests.insert(hash, manifest);
