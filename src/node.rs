@@ -128,6 +128,7 @@ impl Node {
 
       let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
 
+      #[cfg(unix)]
       socket.set_reuse_port(true).unwrap();
 
       socket
